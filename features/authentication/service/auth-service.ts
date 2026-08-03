@@ -1,4 +1,4 @@
-// features/authentication/services/auth-service.ts
+// features/authentication/service/auth-service.ts
 
 type GoogleSignInResponse = {
     url: string;
