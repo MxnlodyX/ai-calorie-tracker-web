@@ -169,6 +169,34 @@ export function IconTrash(props: IconProps) {
   );
 }
 
+export function IconClock(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </IconBase>
+  );
+}
+
+export function IconTrendingUp(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="m3 17 6-6 4 4 7-7" />
+      <path d="M14 8h6v6" />
+    </IconBase>
+  );
+}
+
+export function IconAlertTriangle(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M10.3 4.2 2.6 17.5A2 2 0 0 0 4.3 20h15.4a2 2 0 0 0 1.7-2.5L13.7 4.2a2 2 0 0 0-3.4 0Z" />
+      <path d="M12 9v4" />
+      <path d="M12 17h.01" />
+    </IconBase>
+  );
+}
+
 export const ArrowLeft = IconArrowLeft;
 export const ArrowRight = IconArrowRight;
 export const Check = IconCircleCheck;
