@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api-client";
+import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api-client";
 
 import type {
   CreateFoodPayload,
@@ -9,10 +9,10 @@ import type {
 } from "./types";
 
 const dashboardEndpoints = {
-  foods: (userId: string) => `/api/meals?userId=${encodeURIComponent(userId)}`,
-  menulists: (userId: string) =>
-    `/api/menulists?userId=${encodeURIComponent(userId)}`,
-  menulist: (mealId: string) => `/api/menulists/${encodeURIComponent(mealId)}`,
+  foods: (userId: string) => `/api/foods?userId=${encodeURIComponent(userId)}`,
+  foodLists: (userId: string) =>
+    `/api/food-lists?userId=${encodeURIComponent(userId)}`,
+  foodList: (mealId: string) => `/api/food-lists/${encodeURIComponent(mealId)}`,
 };
 
 type LegacyMeal = {
@@ -56,18 +56,18 @@ export async function getFoods(userId: string): Promise<FoodItem[]> {
 
 export function createFood(payload: CreateFoodPayload) {
   return apiPost<FoodItem | LegacyMeal, CreateFoodPayload>(
-    "/api/meals",
+    "/api/foods",
     payload,
   ).then(toFoodItem);
 }
 
 export function getMenulists(userId: string) {
-  return apiGet<MenulistItem[]>(dashboardEndpoints.menulists(userId));
+  return apiGet<MenulistItem[]>(dashboardEndpoints.foodLists(userId));
 }
 
 export function createMenulist(payload: CreateMenulistPayload) {
   return apiPost<MenulistItem, CreateMenulistPayload>(
-    "/api/menulists",
+    "/api/food-lists",
     payload,
   );
 }
@@ -76,12 +76,12 @@ export function updateMenulist(
   mealId: string,
   payload: UpdateMenulistPayload,
 ) {
-  return apiPut<MenulistItem, UpdateMenulistPayload>(
-    dashboardEndpoints.menulist(mealId),
+  return apiPatch<MenulistItem, UpdateMenulistPayload>(
+    dashboardEndpoints.foodList(mealId),
     payload,
   );
 }
 
 export function deleteMenulist(mealId: string) {
-  return apiDelete(dashboardEndpoints.menulist(mealId));
+  return apiDelete(dashboardEndpoints.foodList(mealId));
 }
