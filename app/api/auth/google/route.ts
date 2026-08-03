@@ -2,7 +2,7 @@
 
 import { NextResponse } from "next/server";
 
-export async function POST() {
+export function GET() {
   const googleAuthUrl = process.env.GOOGLE_AUTH_URL;
 
   if (!googleAuthUrl) {
@@ -12,9 +12,5 @@ export async function POST() {
     );
   }
 
-  return NextResponse.json({
-    data: {
-      url: googleAuthUrl,
-    },
-  });
+  return NextResponse.redirect(googleAuthUrl);
 }

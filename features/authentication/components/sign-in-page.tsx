@@ -1,21 +1,16 @@
 "use client";
-import { startGoogleSignIn } from "@/features/authentication/service/auth-service";
+
 import { useState } from "react";
 
+import { startGoogleSignIn } from "@/features/authentication/api";
 
 export function SignInPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSigningIn, setIsSigningIn] = useState(false);
-  const handleGoogleOAuthSignIn = async () => {
+  const handleGoogleOAuthSignIn = () => {
     setIsSigningIn(true);
     setErrorMessage(null);
-    try {
-      await startGoogleSignIn();
-    } catch {
-      setErrorMessage("Failed to sign in with Google. Please try again.");
-    } finally {
-      setIsSigningIn(false);
-    }
+    startGoogleSignIn();
   };
   return (
     <main className="relative grid min-h-screen place-items-center overflow-hidden bg-[#f7fbf3] px-5 py-8 text-[#172019]">
@@ -46,7 +41,7 @@ export function SignInPage() {
             className="mt-8 flex h-14 w-full items-center justify-center gap-3 rounded-xl bg-white px-4 text-sm font-bold text-[#253025] shadow-[0_14px_30px_rgba(56,103,43,0.12)] ring-1 ring-[#e1edd8] transition hover:-translate-y-0.5 hover:shadow-[0_18px_34px_rgba(56,103,43,0.18)] focus:outline-none focus:ring-2 focus:ring-[#65b741] focus:ring-offset-2"
             type="button"
             disabled={isSigningIn}
-            onClick={() => { void handleGoogleOAuthSignIn(); }}
+            onClick={handleGoogleOAuthSignIn}
           >
             <GoogleIcon />
             {isSigningIn ? "Connecting..." : "Continue with Google"}
