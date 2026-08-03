@@ -505,7 +505,6 @@ export function Dashboard() {
       />
       <AddManualMeal
         isOpen={isManualMealOpen}
-        userId={activeUserId}
         isSaving={isSavingExistingMeal}
         isLoggingMeal={isSavingTodayMeal}
         onAddMeal={handleAddMeal}

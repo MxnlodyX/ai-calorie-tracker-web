@@ -14,7 +14,6 @@ import type { DashboardMeal, MealType } from "@/features/dashboard/types";
 
 type AddManualMealProps = {
   isOpen: boolean;
-  userId: string;
   isSaving: boolean;
   isLoggingMeal: boolean;
   onAddMeal: (meal: DashboardMeal) => Promise<boolean>;
@@ -37,12 +36,6 @@ const defaultFormValues = {
 type FormErrors = Partial<Record<keyof typeof defaultFormValues, string>>;
 
 const nutritionFields = ["calories", "protein", "carbs", "fat"] as const;
-
-const parsePreviewNumber = (value: string) => {
-  const parsed = Number(value);
-
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
-};
 
 const validateFormValues = (
   formValues: typeof defaultFormValues,
@@ -82,7 +75,6 @@ const validateFormValues = (
 
 export function AddManualMeal({
   isOpen,
-  userId,
   isSaving,
   isLoggingMeal,
   onAddMeal,
@@ -93,16 +85,6 @@ export function AddManualMeal({
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [saveToExistingList, setSaveToExistingList] = useState(true);
   const { showAlert } = useAlert();
-  const backendJsonPreview = {
-    userId,
-    name: formValues.name.trim() || "Manual meal name",
-    mealType: formValues.mealType,
-    description: formValues.description.trim() || undefined,
-    kcal: parsePreviewNumber(formValues.calories),
-    proteinG: parsePreviewNumber(formValues.protein),
-    carbG: parsePreviewNumber(formValues.carbs),
-    fatG: parsePreviewNumber(formValues.fat),
-  };
 
   if (!isOpen) {
     return null;
@@ -220,21 +202,6 @@ export function AddManualMeal({
           />
         </label>
 
-        {saveToExistingList ? (
-          <div className="mt-3 rounded-[1rem] border-2 border-[#20342d] bg-[#101f1a] p-3 text-white shadow-[2px_2px_0_#20342d]">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-xs font-black uppercase text-[#ffdf5d]">
-                POST /api/menulists
-              </span>
-              <span className="rounded-full border border-white/40 px-2 py-0.5 text-[10px] font-black uppercase text-white/80">
-                Existing list
-              </span>
-            </div>
-            <pre className="mt-2 max-h-48 overflow-auto rounded-[0.75rem] bg-black/25 p-3 text-xs font-bold leading-5 text-[#f3fbf1]">
-              {JSON.stringify(backendJsonPreview, null, 2)}
-            </pre>
-          </div>
-        ) : null}
 
         <fieldset className="mt-5">
           <legend className="text-xs font-black uppercase tracking-[0.14em] text-[#66766f]">
