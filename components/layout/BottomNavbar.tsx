@@ -3,7 +3,7 @@ import Link from "next/link";
 const navItems = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/analyze", label: "Scan" },
-  { href: "/meal_history", label: "History" },
+  { href: "/history", label: "History" },
 ];
 
 export function BottomNavbar() {

@@ -35,6 +35,8 @@ export type CreateFoodPayload = {
   eatenAt: string;
 };
 
+export type UpdateFoodPayload = Partial<Omit<CreateFoodPayload, "userId">>;
+
 export type MenulistItem = {
   id: string;
   userId?: string;

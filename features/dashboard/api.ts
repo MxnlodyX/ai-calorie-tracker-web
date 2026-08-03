@@ -5,11 +5,13 @@ import type {
   CreateMenulistPayload,
   FoodItem,
   MenulistItem,
+  UpdateFoodPayload,
   UpdateMenulistPayload,
 } from "./types";
 
 const dashboardEndpoints = {
   foods: (userId: string) => `/api/foods?userId=${encodeURIComponent(userId)}`,
+  food: (mealId: string) => `/api/foods/${encodeURIComponent(mealId)}`,
   foodLists: (userId: string) =>
     `/api/food-lists?userId=${encodeURIComponent(userId)}`,
   foodList: (mealId: string) => `/api/food-lists/${encodeURIComponent(mealId)}`,
@@ -59,6 +61,17 @@ export function createFood(payload: CreateFoodPayload) {
     "/api/foods",
     payload,
   ).then(toFoodItem);
+}
+
+export function updateFood(mealId: string, payload: UpdateFoodPayload) {
+  return apiPatch<FoodItem | LegacyMeal, UpdateFoodPayload>(
+    dashboardEndpoints.food(mealId),
+    payload,
+  ).then(toFoodItem);
+}
+
+export function deleteFood(mealId: string) {
+  return apiDelete(dashboardEndpoints.food(mealId));
 }
 
 export function getMenulists(userId: string) {
