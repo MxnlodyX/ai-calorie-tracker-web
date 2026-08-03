@@ -71,6 +71,23 @@ export async function apiPut<TResponse, TPayload>(
   return parseApiResponse<TResponse>(response);
 }
 
+export async function apiPatch<TResponse, TPayload>(
+  path: string,
+  payload: TPayload,
+): Promise<TResponse> {
+  const response = await fetch(path, {
+    method: "PATCH",
+    credentials: "include",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  return parseApiResponse<TResponse>(response);
+}
+
 export async function apiDelete(path: string): Promise<void> {
   const response = await fetch(path, {
     method: "DELETE",
