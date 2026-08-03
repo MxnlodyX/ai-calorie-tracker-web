@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   IconArrowRight,
   IconCalendarStats,
@@ -23,18 +23,19 @@ import {
   deleteMenulist,
   getMenulists,
   updateMenulist,
-  createFood,
-  getFoods,
 } from "@/features/dashboard/api";
 import {
   dashboardMealToFoodPayload,
   dashboardMealToMenulistPayload,
   foodToDashboardMeal,
-  isTodayFoodItem,
   menulistToDashboardMeal,
 } from "@/features/dashboard/mappers";
 import type { DashboardMeal } from "@/features/dashboard/types";
-import { useGetMeQuery } from "@/store/api";
+import {
+  useCreateFoodMutation,
+  useGetFoodsByDateQuery,
+  useGetMeQuery,
+} from "@/store/api";
 
 const quickActions = [
   {
@@ -45,20 +46,22 @@ const quickActions = [
   },
   {
     label: "View history",
-    href: "/meal_history",
+    href: "/history",
     Icon: IconCalendarStats,
     color: "bg-white text-[#20342d]",
   },
 ];
 
-const getTodayDashboardMeals = async (userId: string) => {
-  const foodItems = await getFoods(userId);
-
-  return foodItems.filter(isTodayFoodItem).map(foodToDashboardMeal);
-};
-
 const getErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : "Please try again.";
+
+function formatLocalDate(date: Date) {
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, "0");
+  const day = date.getDate().toString().padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
 
 const formatProfileValue = (value: number | null, unit: string) =>
   value === null ? "Not set" : `${value.toLocaleString()} ${unit}`;
@@ -74,11 +77,9 @@ export function Dashboard() {
     data: user,
     isLoading: isLoadingUser,
   } = useGetMeQuery();
-  const [meals, setMeals] = useState<DashboardMeal[]>([]);
+  const [createFoodMutation, createFoodMutationResult] =
+    useCreateFoodMutation();
   const [existingMeals, setExistingMeals] = useState<DashboardMeal[]>([]);
-  const [isLoadingTodayMeals, setIsLoadingTodayMeals] = useState(true);
-  const [todayMealsError, setTodayMealsError] = useState<string | null>(null);
-  const [isSavingTodayMeal, setIsSavingTodayMeal] = useState(false);
   const [isLoadingExistingMeals, setIsLoadingExistingMeals] = useState(true);
   const [existingMealsError, setExistingMealsError] = useState<string | null>(
     null,
@@ -88,6 +89,26 @@ export function Dashboard() {
   const [isManualMealOpen, setIsManualMealOpen] = useState(false);
   const { showAlert } = useAlert();
   const activeUserId = user?.id ?? "";
+  const todayDate = formatLocalDate(new Date());
+  const {
+    data: todayFoodItems = [],
+    isLoading: isLoadingTodayFoods,
+    isError: hasTodayFoodsError,
+  } = useGetFoodsByDateQuery(todayDate, {
+    skip: isLoadingUser || !activeUserId,
+  });
+  const meals = useMemo(
+    () => todayFoodItems.map(foodToDashboardMeal),
+    [todayFoodItems],
+  );
+  const todayMealsError =
+    !isLoadingUser && !activeUserId
+      ? "Your user session is missing an id."
+      : hasTodayFoodsError
+        ? "Today's meals could not sync. Please try again later."
+        : null;
+  const isLoadingTodayMeals = isLoadingUser || isLoadingTodayFoods;
+  const isSavingTodayMeal = createFoodMutationResult.isLoading;
   const displayName = user?.name ?? user?.email ?? "Your profile";
   const firstName =
     user?.name?.split(" ")[0] ?? user?.email?.split("@")[0] ?? "there";
@@ -103,27 +124,6 @@ export function Dashboard() {
     month: "short",
     day: "numeric",
   }).format(new Date());
-  const loadTodayMeals = useCallback(async () => {
-    if (!activeUserId) {
-      setIsLoadingTodayMeals(false);
-      setTodayMealsError("Your user session is missing an id.");
-      return;
-    }
-
-    setIsLoadingTodayMeals(true);
-    setTodayMealsError(null);
-
-    try {
-      const nextMeals = await getTodayDashboardMeals(activeUserId);
-
-      setMeals(nextMeals);
-    } catch {
-      setMeals([]);
-      setTodayMealsError("Today's meals could not sync. Please try again later.");
-    } finally {
-      setIsLoadingTodayMeals(false);
-    }
-  }, [activeUserId]);
 
   useEffect(() => {
     let isMounted = true;
@@ -161,41 +161,6 @@ export function Dashboard() {
       }
     }
 
-    async function loadTodayMealsForEffect() {
-      if (!activeUserId) {
-        setIsLoadingTodayMeals(false);
-        setTodayMealsError("Your user session is missing an id.");
-        return;
-      }
-
-      setIsLoadingTodayMeals(true);
-      setTodayMealsError(null);
-
-      try {
-        const nextMeals = await getTodayDashboardMeals(activeUserId);
-
-        if (!isMounted) {
-          return;
-        }
-
-        setMeals(nextMeals);
-      } catch {
-        if (!isMounted) {
-          return;
-        }
-
-        setMeals([]);
-        setTodayMealsError(
-          "Today's meals could not sync. Please try again later.",
-        );
-      } finally {
-        if (isMounted) {
-          setIsLoadingTodayMeals(false);
-        }
-      }
-    }
-
-    void loadTodayMealsForEffect();
     void loadExistingMeals();
 
     return () => {
@@ -213,11 +178,10 @@ export function Dashboard() {
       return false;
     }
 
-    setIsSavingTodayMeal(true);
-
     try {
-      await createFood(dashboardMealToFoodPayload(meal, activeUserId));
-      await loadTodayMeals();
+      await createFoodMutation(
+        dashboardMealToFoodPayload(meal, activeUserId),
+      ).unwrap();
       return true;
     } catch (error) {
       showAlert({
@@ -226,8 +190,6 @@ export function Dashboard() {
         message: getErrorMessage(error),
       });
       return false;
-    } finally {
-      setIsSavingTodayMeal(false);
     }
   };
   const handleSaveExistingMeal = async (meal: DashboardMeal) => {
