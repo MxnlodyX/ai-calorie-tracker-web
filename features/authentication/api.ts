@@ -1,13 +1,19 @@
+import { API_BASE_URL } from "@/lib/api-url";
+import { apiFetch } from "@/lib/api-client";
+
 export function startGoogleSignIn(): void {
-  window.location.href = "/api/auth/google";
+  window.location.assign(`${API_BASE_URL}/authentications/google`);
 }
 
 export async function logout(): Promise<void> {
-  await fetch("/api/auth/logout", {
+  const response = await apiFetch("/authentications/logout", {
     method: "POST",
-    credentials: "include",
     headers: {
       Accept: "application/json",
     },
-  }).catch(() => undefined);
+  });
+
+  if (!response.ok && response.status !== 401) {
+    throw new Error(`Logout failed with status ${response.status}`);
+  }
 }

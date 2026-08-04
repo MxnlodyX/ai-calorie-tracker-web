@@ -25,17 +25,26 @@ import {
   useRef,
   useState,
 } from "react";
+import { useDispatch } from "react-redux";
 
 import { BottomNavbar } from "@/components/layout/BottomNavbar";
 import { useAlert } from "@/components/ui/alert-provider";
-import { createMenulist } from "@/features/dashboard/api";
-import { useGetMeQuery } from "@/store/api";
+import {
+  acceptAnalysis,
+  AnalyzeApiError,
+  analyzeSelectedImage,
+  rejectAnalysis,
+  retryAnalysis,
+} from "@/features/analyze/api";
+import type { FoodAnalysis } from "@/features/analyze/types";
+import { api } from "@/store/api";
+import type { AppDispatch } from "@/store/store";
 
 type FlowStep = "camera" | "processing" | "result";
 
 type NutritionResult = {
   name: string;
-  mealType: "Breakfast" | "Lunch" | "Dinner" | "Additional";
+  mealType: "breakfast" | "lunch" | "dinner" | "additional";
   calories: number;
   protein: number;
   carbs: number;
@@ -43,13 +52,16 @@ type NutritionResult = {
 };
 
 const initialResult: NutritionResult = {
-  name: "Grilled chicken power bowl",
-  mealType: "Lunch",
-  calories: 528,
-  protein: 42,
-  carbs: 48,
-  fat: 19,
+  name: "",
+  mealType: "lunch",
+  calories: 0,
+  protein: 0,
+  carbs: 0,
+  fat: 0,
 };
+
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 const analysisStages = [
   "Finding foods on your plate",
@@ -58,9 +70,9 @@ const analysisStages = [
 ];
 
 const nutrients = [
-  { key: "protein", label: "Protein", unit: "g", color: "bg-[#dbe8a7]" },
-  { key: "carbs", label: "Carbs", unit: "g", color: "bg-[#ffdf5d]" },
-  { key: "fat", label: "Fat", unit: "g", color: "bg-[#ffc8aa]" },
+  { key: "protein", label: "Protein", unit: "g", color: "bg-[#e8f7df]" },
+  { key: "carbs", label: "Carbs", unit: "g", color: "bg-[#fff4c7]" },
+  { key: "fat", label: "Fat", unit: "g", color: "bg-[#ffead8]" },
 ] as const;
 
 export function AnalyzeMeal() {
@@ -70,12 +82,14 @@ export function AnalyzeMeal() {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [analysisStage, setAnalysisStage] = useState(0);
   const [result, setResult] = useState<NutritionResult>(initialResult);
-  const [saveToMealList, setSaveToMealList] = useState(true);
-  const [isAccepting, setIsAccepting] = useState(false);
+  const [analysis, setAnalysis] = useState<FoodAnalysis | null>(null);
+  const [eatenAt, setEatenAt] = useState<string | null>(null);
+  const [saveToMealList, setSaveToMealList] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const { showAlert } = useAlert();
-  const { data: user } = useGetMeQuery();
+  const dispatch = useDispatch<AppDispatch>();
   const router = useRouter();
 
   const stopCamera = () => {
@@ -86,21 +100,20 @@ export function AnalyzeMeal() {
 
   useEffect(() => stopCamera, []);
 
+  useEffect(
+    () => () => {
+      if (photoUrl?.startsWith("blob:")) URL.revokeObjectURL(photoUrl);
+    },
+    [photoUrl],
+  );
+
   useEffect(() => {
     if (step !== "processing") return;
-
-    const stageTimer = window.setInterval(() => {
-      setAnalysisStage((current) => Math.min(current + 1, 2));
-    }, 650);
-    const resultTimer = window.setTimeout(() => {
-      window.clearInterval(stageTimer);
-      setStep("result");
-    }, 2300);
-
-    return () => {
-      window.clearInterval(stageTimer);
-      window.clearTimeout(resultTimer);
-    };
+    const stageTimer = window.setInterval(
+      () => setAnalysisStage((current) => Math.min(current + 1, 2)),
+      900,
+    );
+    return () => window.clearInterval(stageTimer);
   }, [step]);
 
   const startCamera = async () => {
@@ -120,11 +133,75 @@ export function AnalyzeMeal() {
     }
   };
 
-  const beginAnalysis = (url?: string) => {
+  const showRequestError = (error: unknown, fallback: string) => {
+    if (error instanceof AnalyzeApiError && error.status === 401) {
+      showAlert({
+        type: "info",
+        title: "Please sign in again",
+        message: "Your session has expired. Redirecting you to sign in.",
+      });
+      router.replace("/");
+      return;
+    }
+
+    showAlert({
+      type: "error",
+      title: fallback,
+      message: error instanceof Error ? error.message : "Please try again.",
+    });
+  };
+
+  const setAnalysisResult = (nextAnalysis: FoodAnalysis) => {
+    setAnalysis(nextAnalysis);
+    setResult((current) => ({
+      ...current,
+      name: nextAnalysis.foodName,
+      calories: nextAnalysis.kcal,
+      protein: nextAnalysis.proteinG ?? 0,
+      carbs: nextAnalysis.carbG ?? 0,
+      fat: nextAnalysis.fatG ?? 0,
+    }));
+    setStep("result");
+  };
+
+  const beginAnalysis = async (file: File, url: string) => {
     stopCamera();
-    if (url) setPhotoUrl(url);
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      if (url.startsWith("blob:")) URL.revokeObjectURL(url);
+      showAlert({
+        type: "error",
+        title: "Unsupported image",
+        message: "Choose a JPEG, PNG, or WebP image.",
+      });
+      return;
+    }
+    if (file.size > MAX_IMAGE_SIZE) {
+      if (url.startsWith("blob:")) URL.revokeObjectURL(url);
+      showAlert({
+        type: "error",
+        title: "Image is too large",
+        message: "Choose an image no larger than 5 MB.",
+      });
+      return;
+    }
+
+    setPhotoUrl(url);
     setAnalysisStage(0);
     setStep("processing");
+    const selectedEatenAt = new Date().toISOString();
+    setEatenAt(selectedEatenAt);
+
+    try {
+      const nextAnalysis = await analyzeSelectedImage(
+        file,
+        result.mealType,
+        selectedEatenAt,
+      );
+      setAnalysisResult(nextAnalysis);
+    } catch (error) {
+      setStep("camera");
+      showRequestError(error, "Could not analyze this meal");
+    }
   };
 
   const capturePhoto = () => {
@@ -134,21 +211,36 @@ export function AnalyzeMeal() {
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     canvas.getContext("2d")?.drawImage(video, 0, 0);
-    beginAnalysis(canvas.toDataURL("image/jpeg", 0.88));
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          showRequestError(null, "Could not capture this photo");
+          return;
+        }
+        const file = new File([blob], `meal-${Date.now()}.jpg`, {
+          type: "image/jpeg",
+        });
+        void beginAnalysis(file, URL.createObjectURL(blob));
+      },
+      "image/jpeg",
+      0.88,
+    );
   };
 
   const handleFile = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    beginAnalysis(URL.createObjectURL(file));
+    void beginAnalysis(file, URL.createObjectURL(file));
     event.target.value = "";
   };
 
   const reset = () => {
     stopCamera();
-    if (photoUrl?.startsWith("blob:")) URL.revokeObjectURL(photoUrl);
     setPhotoUrl(null);
     setResult(initialResult);
+    setAnalysis(null);
+    setEatenAt(null);
+    setSaveToMealList(false);
     setStep("camera");
   };
 
@@ -163,63 +255,79 @@ export function AnalyzeMeal() {
   };
 
   const acceptResponse = async () => {
-    if (saveToMealList && !user?.id) {
-      showAlert({
-        type: "info",
-        title: "Sign in to save this meal",
-        message: "Turn off “Save to meal list” to continue without saving.",
-      });
-      return;
-    }
-
-    setIsAccepting(true);
+    if (!analysis || !eatenAt) return;
+    setIsSubmitting(true);
     try {
-      if (saveToMealList && user?.id) {
-        await createMenulist({
-          userId: user.id,
-          name: result.name,
-          mealType: result.mealType,
-          description: "AI estimate from a meal photo",
-          kcal: result.calories,
-          proteinG: result.protein,
-          carbG: result.carbs,
-          fatG: result.fat,
-        });
-      }
-      router.push("/dashboard");
-    } catch {
-      showAlert({
-        type: "error",
-        title: "Meal not saved",
-        message: "Please check your connection and try again.",
+      await acceptAnalysis(analysis.id, {
+        foodName: result.name,
+        calories: result.calories,
+        proteinG: result.protein,
+        carbsG: result.carbs,
+        fatG: result.fat,
+        mealType: result.mealType,
+        eatenAt,
+        saveToFoodList: saveToMealList,
       });
-      setIsAccepting(false);
+      dispatch(api.util.invalidateTags(["FoodsByDate", "MealHistory"]));
+      router.push("/dashboard");
+    } catch (error) {
+      showRequestError(error, "Meal not saved");
+      setIsSubmitting(false);
+    }
+  };
+
+  const retryResponse = async () => {
+    if (!analysis) return;
+    setIsSubmitting(true);
+    setAnalysisStage(0);
+    setStep("processing");
+    try {
+      const response = await retryAnalysis(analysis.id);
+      setAnalysisResult(response.data);
+    } catch (error) {
+      setStep("result");
+      showRequestError(error, "Could not retry analysis");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const rejectResponse = async () => {
+    if (!analysis) return reset();
+    setIsSubmitting(true);
+    try {
+      await rejectAnalysis(analysis.id);
+      reset();
+    } catch (error) {
+      showRequestError(error, "Could not reject analysis");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <main className="min-h-screen bg-[#fff7df] px-4 pb-28 pt-4 text-[#20342d] sm:px-6 sm:pt-6">
+    <main className="app-page min-h-screen px-3.5 pt-3 text-[#172019] sm:px-6 sm:pt-6">
       <div className="mx-auto w-full max-w-6xl">
         <header className="flex items-center justify-between gap-4">
           <Link
             href="/dashboard"
-            className="grid size-11 shrink-0 place-items-center rounded-full border-2 border-[#20342d] bg-white shadow-[0_3px_0_#20342d] transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#20342d]"
+            className="grid size-10 shrink-0 place-items-center rounded-xl bg-white/85 text-[#235b30] shadow-[0_10px_24px_rgba(56,103,43,0.12)] ring-1 ring-[#e1edd8] transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65b741] sm:size-11"
             aria-label="Back to dashboard"
           >
             <ArrowLeft className="size-5" aria-hidden="true" />
           </Link>
           <div className="text-center">
-            <p className="text-[0.65rem] font-black uppercase tracking-[0.18em] text-[#b6532d]">
+            <p className="text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[#22945f]">
               AI meal scanner
             </p>
-            <h1 className="mt-0.5 text-lg font-black sm:text-xl">Snap & track</h1>
+            <h1 className="mt-0.5 text-lg font-bold sm:text-xl">Snap & track</h1>
           </div>
-          <span className="grid size-11 place-items-center rounded-full border-2 border-[#20342d] bg-[#dbe8a7]">
+          <span className="grid size-10 place-items-center rounded-xl bg-gradient-to-br from-[#65b741] to-[#22945f] text-white shadow-[0_12px_26px_rgba(34,148,95,0.24)] sm:size-11 sm:rounded-2xl">
             <Leaf className="size-5" aria-hidden="true" />
           </span>
         </header>
 
-        <ol className="mx-auto mt-5 flex max-w-sm items-center" aria-label="Analysis progress">
+        <ol className="mx-auto mt-3 flex max-w-sm items-center sm:mt-5" aria-label="Analysis progress">
           {["Photo", "Analyze", "Review"].map((label, index) => {
             const currentIndex = step === "camera" ? 0 : step === "processing" ? 1 : 2;
             const complete = index < currentIndex;
@@ -228,15 +336,15 @@ export function AnalyzeMeal() {
               <li key={label} className="flex flex-1 items-center last:flex-none">
                 <div className="flex flex-col items-center gap-1">
                   <span
-                    className={`grid size-7 place-items-center rounded-full border-2 border-[#20342d] text-[0.65rem] font-black ${
-                      complete ? "bg-[#20342d] text-white" : current ? "bg-[#ffdf5d]" : "bg-white text-[#7c8883]"
+                    className={`grid size-7 place-items-center rounded-full text-[0.65rem] font-bold ring-1 ring-[#dce9d4] ${
+                      complete ? "bg-[#22945f] text-white" : current ? "bg-[#c9f087] text-[#235b30]" : "bg-white/80 text-[#7c8883]"
                     }`}
                   >
                     {complete ? <Check className="size-4" /> : index + 1}
                   </span>
                   <span className="text-[0.62rem] font-black uppercase tracking-wider">{label}</span>
                 </div>
-                {index < 2 ? <span className={`mx-2 mb-5 h-0.5 flex-1 ${complete ? "bg-[#20342d]" : "bg-[#c9c8bf]"}`} /> : null}
+                {index < 2 ? <span className={`mx-2 mb-5 h-0.5 flex-1 ${complete ? "bg-[#65b741]" : "bg-[#dce9d4]"}`} /> : null}
               </li>
             );
           })}
@@ -250,7 +358,6 @@ export function AnalyzeMeal() {
             onStartCamera={startCamera}
             onCapture={capturePhoto}
             onFile={handleFile}
-            onDemo={() => beginAnalysis()}
           />
         ) : null}
 
@@ -262,17 +369,15 @@ export function AnalyzeMeal() {
           <ResultStep
             photoUrl={photoUrl}
             result={result}
+            confidence={analysis?.confidence ?? null}
             saveToMealList={saveToMealList}
-            isAccepting={isAccepting}
+            isSubmitting={isSubmitting}
             onResultChange={setResult}
             onNumberChange={updateNumber}
             onSavePreferenceChange={() => setSaveToMealList((current) => !current)}
             onAccept={acceptResponse}
-            onReject={reset}
-            onRetry={() => {
-              setAnalysisStage(0);
-              setStep("processing");
-            }}
+            onReject={rejectResponse}
+            onRetry={retryResponse}
           />
         ) : null}
       </div>
@@ -288,7 +393,6 @@ type CameraStepProps = {
   onStartCamera: () => void;
   onCapture: () => void;
   onFile: (event: ChangeEvent<HTMLInputElement>) => void;
-  onDemo: () => void;
 };
 
 function CameraStep({
@@ -298,23 +402,22 @@ function CameraStep({
   onStartCamera,
   onCapture,
   onFile,
-  onDemo,
 }: CameraStepProps) {
   return (
-    <section className="mx-auto mt-4 max-w-3xl overflow-hidden rounded-[1.75rem] border-2 border-[#20342d] bg-white shadow-[0_8px_0_#20342d]">
-      <div className="relative aspect-[4/5] max-h-[32rem] w-full overflow-hidden bg-[#20342d] sm:aspect-[16/10]">
+    <section className="app-panel mx-auto mt-3 max-w-3xl overflow-hidden rounded-[24px] sm:mt-4 sm:rounded-[30px]">
+      <div className="relative h-[min(52svh,25rem)] w-full overflow-hidden bg-[#235b30] sm:h-auto sm:max-h-[32rem] sm:aspect-[16/10]">
         {cameraActive ? (
           <video ref={videoRef} autoPlay playsInline muted className="size-full object-cover" />
         ) : (
-          <div className="absolute inset-0 grid place-items-center overflow-hidden bg-[#dbe8a7]">
-            <div className="absolute -left-16 -top-12 size-52 rounded-full bg-[#ffdf5d]/75" />
-            <div className="absolute -bottom-24 -right-14 size-72 rounded-full bg-[#ffc8aa]/80" />
+          <div className="absolute inset-0 grid place-items-center overflow-hidden bg-gradient-to-br from-[#235b30] via-[#22945f] to-[#95d85a] text-white">
+            <div className="absolute -left-16 -top-12 size-52 rounded-full bg-[#fff4c7]/25 blur-sm" />
+            <div className="absolute -bottom-24 -right-14 size-72 rounded-full bg-[#c9f087]/25 blur-sm" />
             <div className="relative flex max-w-sm flex-col items-center px-8 text-center">
-              <span className="grid size-20 place-items-center rounded-full border-2 border-[#20342d] bg-white shadow-[0_5px_0_#20342d]">
+              <span className="grid size-16 place-items-center rounded-[20px] bg-white/15 shadow-[0_18px_36px_rgba(18,73,43,0.2)] ring-1 ring-white/35 backdrop-blur-sm sm:size-20 sm:rounded-[24px]">
                 <Camera className="size-9" aria-hidden="true" />
               </span>
-              <h2 className="mt-6 text-3xl font-black leading-tight">Show us your plate</h2>
-              <p className="mt-3 text-sm font-bold leading-6 text-[#52635c]">
+              <h2 className="mt-4 text-2xl font-bold leading-tight sm:mt-6 sm:text-3xl">Show us your plate</h2>
+              <p className="mt-2 text-xs leading-5 text-white/75 sm:mt-3 sm:text-sm sm:leading-6">
                 Center the whole meal in good light. We’ll estimate calories and macros for you.
               </p>
             </div>
@@ -330,34 +433,31 @@ function CameraStep({
           <button
             type="button"
             onClick={onCapture}
-            className="absolute bottom-6 left-1/2 grid size-[4.5rem] -translate-x-1/2 place-items-center rounded-full border-4 border-white bg-[#ffdf5d] shadow-[0_0_0_2px_#20342d] transition active:scale-95"
+            className="absolute bottom-6 left-1/2 grid size-[4.5rem] -translate-x-1/2 place-items-center rounded-full border-4 border-white bg-[#c9f087] shadow-[0_14px_30px_rgba(18,73,43,0.28)] transition active:scale-95"
             aria-label="Take photo"
           >
-            <span className="size-10 rounded-full border-2 border-[#20342d]" />
+            <span className="size-10 rounded-full ring-2 ring-[#235b30]" />
           </button>
         ) : null}
       </div>
 
-      <div className="p-4 sm:p-6">
+      <div className="p-3 sm:p-6">
         {cameraError ? <p className="mb-3 text-center text-xs font-bold text-[#b6532d]">{cameraError}</p> : null}
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3">
           <button
             type="button"
             onClick={onStartCamera}
-            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border-2 border-[#20342d] bg-[#20342d] px-5 text-sm font-black text-white shadow-[0_4px_0_#96ab80] transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#20342d]"
+            className="inline-flex min-h-12 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-br from-[#65b741] to-[#22945f] px-2 text-xs font-bold text-white shadow-[0_14px_28px_rgba(34,148,95,0.25)] transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65b741] sm:gap-2 sm:px-5 sm:text-sm"
           >
             <Camera className="size-5" aria-hidden="true" />
             {cameraActive ? "Camera ready" : "Open camera"}
           </button>
-          <label className="inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-full border-2 border-[#20342d] bg-[#ffdf5d] px-5 text-sm font-black shadow-[0_4px_0_#20342d] transition hover:-translate-y-0.5 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[#20342d]">
+          <label className="inline-flex min-h-12 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-white px-2 text-xs font-bold text-[#253025] shadow-[0_12px_26px_rgba(56,103,43,0.12)] ring-1 ring-[#e1edd8] transition hover:-translate-y-0.5 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[#65b741] sm:gap-2 sm:px-5 sm:text-sm">
             <ImagePlus className="size-5" aria-hidden="true" />
             Upload photo
-            <input type="file" accept="image/*" capture="environment" onChange={onFile} className="sr-only" />
+            <input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={onFile} className="sr-only" />
           </label>
         </div>
-        <button type="button" onClick={onDemo} className="mx-auto mt-4 block text-xs font-black text-[#66766f] underline decoration-2 underline-offset-4 hover:text-[#20342d]">
-          Preview with a sample meal
-        </button>
       </div>
     </section>
   );
@@ -393,36 +493,36 @@ function MealVisual({ photoUrl, className = "" }: { photoUrl: string | null; cla
 
 function ProcessingStep({ photoUrl, analysisStage }: { photoUrl: string | null; analysisStage: number }) {
   return (
-    <section className="mx-auto mt-4 max-w-3xl overflow-hidden rounded-[1.75rem] border-2 border-[#20342d] bg-white shadow-[0_8px_0_#20342d]">
-      <div className="relative h-72 overflow-hidden sm:h-80">
+    <section className="app-panel mx-auto mt-3 max-w-3xl overflow-hidden rounded-[24px] sm:mt-4 sm:rounded-[30px]">
+      <div className="relative h-52 overflow-hidden sm:h-80">
         <MealVisual photoUrl={photoUrl} className="scale-105 blur-[2px] brightness-75" />
-        <div className="absolute inset-0 bg-[#20342d]/20" />
+        <div className="absolute inset-0 bg-[#235b30]/20" />
         <div className="absolute inset-x-8 top-1/2 h-0.5 animate-[scan_1.6s_ease-in-out_infinite] bg-[#ffdf5d] shadow-[0_0_18px_4px_rgba(255,223,93,.8)]" />
-        <span className="absolute left-6 top-6 rounded-full border-2 border-white bg-[#20342d]/80 px-3 py-1.5 text-[0.65rem] font-black uppercase tracking-[0.15em] text-white">
+        <span className="absolute left-6 top-6 rounded-full bg-[#235b30]/80 px-3 py-1.5 text-[0.65rem] font-bold uppercase tracking-[0.15em] text-white ring-1 ring-white/40 backdrop-blur-sm">
           AI vision active
         </span>
       </div>
-      <div className="p-6 sm:p-8">
+      <div className="p-4 sm:p-8">
         <div className="flex items-start gap-4">
-          <span className="grid size-12 shrink-0 place-items-center rounded-full border-2 border-[#20342d] bg-[#ffdf5d]">
+          <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-[#65b741] to-[#22945f] text-white shadow-[0_10px_22px_rgba(34,148,95,0.24)]">
             <LoaderCircle className="size-6 animate-spin" aria-hidden="true" />
           </span>
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.16em] text-[#b6532d]">Analyzing your meal</p>
-            <h2 className="mt-1 text-2xl font-black">Reading what’s on your plate…</h2>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#22945f]">Analyzing your meal</p>
+            <h2 className="mt-1 text-xl font-bold sm:text-2xl">Reading what’s on your plate…</h2>
           </div>
         </div>
-        <div className="mt-6 space-y-3" aria-live="polite">
+        <div className="mt-4 space-y-2.5 sm:mt-6 sm:space-y-3" aria-live="polite">
           {analysisStages.map((stage, index) => (
             <div key={stage} className="flex items-center gap-3">
-              <span className={`grid size-6 place-items-center rounded-full border-2 border-[#20342d] ${index <= analysisStage ? "bg-[#dbe8a7]" : "bg-white"}`}>
-                {index < analysisStage ? <Check className="size-3.5" /> : index === analysisStage ? <span className="size-2 animate-pulse rounded-full bg-[#20342d]" /> : null}
+              <span className={`grid size-6 place-items-center rounded-full ring-1 ring-[#dce9d4] ${index <= analysisStage ? "bg-[#c9f087]" : "bg-white"}`}>
+                {index < analysisStage ? <Check className="size-3.5" /> : index === analysisStage ? <span className="size-2 animate-pulse rounded-full bg-[#22945f]" /> : null}
               </span>
               <span className={`text-sm font-bold ${index <= analysisStage ? "text-[#20342d]" : "text-[#9ca49f]"}`}>{stage}</span>
             </div>
           ))}
         </div>
-        <p className="mt-6 rounded-xl bg-[#fff7df] px-4 py-3 text-xs font-bold leading-5 text-[#66766f]">
+        <p className="mt-6 rounded-xl bg-[#f1f8ec] px-4 py-3 text-xs leading-5 text-[#687566] ring-1 ring-[#e1edd8]">
           AI estimates can vary. You’ll be able to review and adjust everything before saving.
         </p>
       </div>
@@ -433,8 +533,9 @@ function ProcessingStep({ photoUrl, analysisStage }: { photoUrl: string | null; 
 type ResultStepProps = {
   photoUrl: string | null;
   result: NutritionResult;
+  confidence: number | null;
   saveToMealList: boolean;
-  isAccepting: boolean;
+  isSubmitting: boolean;
   onResultChange: (result: NutritionResult) => void;
   onNumberChange: (key: "calories" | "protein" | "carbs" | "fat", value: string) => void;
   onSavePreferenceChange: () => void;
@@ -446,8 +547,9 @@ type ResultStepProps = {
 function ResultStep({
   photoUrl,
   result,
+  confidence,
   saveToMealList,
-  isAccepting,
+  isSubmitting,
   onResultChange,
   onNumberChange,
   onSavePreferenceChange,
@@ -456,66 +558,74 @@ function ResultStep({
   onRetry,
 }: ResultStepProps) {
   return (
-    <section className="mx-auto mt-4 grid max-w-5xl gap-5 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
-      <div className="overflow-hidden rounded-[1.75rem] border-2 border-[#20342d] bg-white shadow-[0_8px_0_#20342d]">
-        <div className="relative aspect-[4/3] overflow-hidden lg:aspect-[4/5]">
+    <section className="mx-auto mt-3 grid max-w-5xl gap-3 sm:mt-4 sm:gap-5 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
+      <div className="app-panel overflow-hidden rounded-[24px] sm:rounded-[30px]">
+        <div className="relative aspect-[16/8] overflow-hidden sm:aspect-[4/3] lg:aspect-[4/5]">
           <MealVisual photoUrl={photoUrl} />
-          <span className="absolute left-4 top-4 inline-flex items-center gap-1.5 rounded-full border-2 border-[#20342d] bg-white px-3 py-1.5 text-xs font-black shadow-[0_3px_0_#20342d]">
-            <Sparkles className="size-4 text-[#b6532d]" /> 92% match
+          <span className="absolute left-4 top-4 inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1.5 text-xs font-bold text-[#235b30] shadow-[0_10px_22px_rgba(56,103,43,0.15)] ring-1 ring-white backdrop-blur-sm">
+            <Sparkles className="size-4 text-[#b6532d]" />
+            {confidence === null
+              ? "AI estimate"
+              : `${Math.round(confidence * 100)}% match`}
           </span>
         </div>
-        <div className="p-4">
+        <div className="p-3 sm:p-4">
           <div className="flex items-start gap-3">
-            <span className="grid size-10 shrink-0 place-items-center rounded-full border-2 border-[#20342d] bg-[#dbe8a7]">
+            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-[#e8f7df] text-[#22945f] sm:size-10">
               <ScanLine className="size-5" />
             </span>
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.14em] text-[#b6532d]">Found on plate</p>
-              <p className="mt-1 text-sm font-bold leading-5 text-[#52635c]">Grilled chicken, brown rice, avocado, greens and tomato.</p>
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#22945f]">Found on plate</p>
+              <p className="mt-0.5 line-clamp-2 text-xs leading-4 text-[#687566] sm:mt-1 sm:text-sm sm:leading-5">
+                {result.name || "Food identified from your photo"}
+              </p>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="rounded-[1.75rem] border-2 border-[#20342d] bg-white p-5 shadow-[0_8px_0_#20342d] sm:p-7">
+      <div className="app-panel rounded-[24px] p-4 sm:rounded-[30px] sm:p-7">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.16em] text-[#b6532d]">AI estimate ready</p>
-            <h2 className="mt-1 text-2xl font-black sm:text-3xl">Review your meal</h2>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#22945f]">AI estimate ready</p>
+            <h2 className="mt-1 text-xl font-bold sm:text-3xl">Review your meal</h2>
           </div>
-          <span className="grid size-10 shrink-0 place-items-center rounded-full border-2 border-[#20342d] bg-[#dbe8a7]">
+          <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-[#65b741] to-[#22945f] text-white shadow-[0_10px_22px_rgba(34,148,95,0.22)]">
             <CheckCircle2 className="size-5" />
           </span>
         </div>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_10rem]">
+        <div className="mt-4 grid gap-2.5 sm:mt-5 sm:grid-cols-[1fr_10rem] sm:gap-3">
           <label className="block">
-            <span className="text-xs font-black text-[#66766f]">Meal name</span>
+            <span className="text-xs font-bold text-[#687566]">Meal name</span>
             <input
               value={result.name}
               onChange={(event) => onResultChange({ ...result, name: event.target.value })}
-              className="mt-1.5 min-h-12 w-full rounded-xl border-2 border-[#20342d] bg-[#fffdf7] px-4 text-sm font-black outline-none focus:bg-white focus:ring-2 focus:ring-[#ffdf5d]"
+              className="app-field mt-1.5 min-h-12 w-full rounded-xl px-4 text-sm font-bold outline-none"
             />
           </label>
           <label className="block">
-            <span className="text-xs font-black text-[#66766f]">Meal type</span>
+            <span className="text-xs font-bold text-[#687566]">Meal type</span>
             <span className="relative mt-1.5 block">
               <select
                 value={result.mealType}
                 onChange={(event) => onResultChange({ ...result, mealType: event.target.value as NutritionResult["mealType"] })}
-                className="min-h-12 w-full appearance-none rounded-xl border-2 border-[#20342d] bg-[#fffdf7] px-4 pr-9 text-sm font-black outline-none focus:bg-white focus:ring-2 focus:ring-[#ffdf5d]"
+                className="app-field min-h-12 w-full appearance-none rounded-xl px-4 pr-9 text-sm font-bold outline-none"
               >
-                <option>Breakfast</option><option>Lunch</option><option>Dinner</option><option>Additional</option>
+                <option value="breakfast">Breakfast</option>
+                <option value="lunch">Lunch</option>
+                <option value="dinner">Dinner</option>
+                <option value="additional">Additional</option>
               </select>
               <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2" />
             </span>
           </label>
         </div>
 
-        <div className="mt-4 rounded-2xl border-2 border-[#20342d] bg-[#20342d] p-4 text-white">
+        <div className="mt-4 rounded-[22px] bg-gradient-to-br from-[#235b30] via-[#22945f] to-[#65b741] p-4 text-white shadow-[0_16px_34px_rgba(34,148,95,0.2)]">
           <div className="flex items-end justify-between gap-4">
             <div>
-              <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-[#dbe8a7]">Estimated energy</p>
+              <p className="text-[0.65rem] font-bold uppercase tracking-[0.16em] text-[#d7f7c3]">Estimated energy</p>
               <div className="mt-1 flex items-baseline gap-2">
                 <input
                   type="number"
@@ -523,19 +633,19 @@ function ResultStep({
                   value={result.calories}
                   onChange={(event) => onNumberChange("calories", event.target.value)}
                   aria-label="Calories"
-                  className="w-28 bg-transparent text-4xl font-black outline-none"
+                  className="w-28 bg-transparent text-4xl font-bold outline-none"
                 />
-                <span className="text-sm font-black text-[#dbe8a7]">kcal</span>
+                <span className="text-sm font-bold text-[#d7f7c3]">kcal</span>
               </div>
             </div>
-            <span className="rounded-full bg-white/10 px-3 py-1 text-[0.65rem] font-black uppercase tracking-wider">1 serving</span>
+            <span className="rounded-full bg-white/15 px-3 py-1 text-[0.65rem] font-bold uppercase tracking-wider ring-1 ring-white/20">1 serving</span>
           </div>
         </div>
 
-        <div className="mt-3 grid grid-cols-3 gap-2.5">
+        <div className="mt-2 grid grid-cols-3 gap-1.5 sm:mt-3 sm:gap-2.5">
           {nutrients.map((nutrient) => (
-            <label key={nutrient.key} className={`rounded-2xl border-2 border-[#20342d] p-3 ${nutrient.color}`}>
-              <span className="block text-[0.65rem] font-black uppercase tracking-wider text-[#52635c]">{nutrient.label}</span>
+            <label key={nutrient.key} className={`rounded-xl p-2 ring-1 ring-[#dce9d4] sm:rounded-2xl sm:p-3 ${nutrient.color}`}>
+              <span className="block text-[0.65rem] font-bold uppercase tracking-wider text-[#687566]">{nutrient.label}</span>
               <span className="mt-1 flex items-baseline gap-0.5">
                 <input
                   type="number"
@@ -543,7 +653,7 @@ function ResultStep({
                   value={result[nutrient.key]}
                   onChange={(event) => onNumberChange(nutrient.key, event.target.value)}
                   aria-label={nutrient.label}
-                  className="min-w-0 w-full bg-transparent text-xl font-black outline-none sm:text-2xl"
+                  className="min-w-0 w-full bg-transparent text-xl font-bold outline-none sm:text-2xl"
                 />
                 <span className="text-xs font-black">{nutrient.unit}</span>
               </span>
@@ -556,34 +666,35 @@ function ResultStep({
           role="switch"
           aria-checked={saveToMealList}
           onClick={onSavePreferenceChange}
-          className="mt-5 flex w-full items-center gap-3 rounded-2xl border-2 border-[#20342d] bg-[#fff7df] p-3 text-left transition hover:bg-[#fff2c7]"
+          className="mt-4 flex w-full items-center gap-2.5 rounded-xl bg-[#f1f8ec] p-2.5 text-left ring-1 ring-[#dce9d4] transition hover:bg-[#e8f5df] sm:mt-5 sm:gap-3 sm:rounded-2xl sm:p-3"
         >
-          <span className="grid size-10 shrink-0 place-items-center rounded-full border-2 border-[#20342d] bg-white">
+          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-[#22945f] shadow-[0_8px_18px_rgba(56,103,43,0.1)]">
             <Save className="size-5" aria-hidden="true" />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block text-sm font-black">Save to meal list</span>
-            <span className="mt-0.5 block text-xs font-bold text-[#66766f]">Keep this meal for quick logging next time.</span>
+            <span className="block text-sm font-bold">Save to meal list</span>
+            <span className="mt-0.5 block text-xs text-[#687566]">Keep this meal for quick logging next time.</span>
           </span>
-          <span className={`relative h-7 w-12 shrink-0 rounded-full border-2 border-[#20342d] transition-colors ${saveToMealList ? "bg-[#dbe8a7]" : "bg-[#d9d9d2]"}`}>
-            <span className={`absolute top-0.5 size-5 rounded-full border-2 border-[#20342d] bg-white transition-transform ${saveToMealList ? "translate-x-[1.15rem]" : "translate-x-0.5"}`} />
+          <span className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${saveToMealList ? "bg-[#65b741]" : "bg-[#cfd9ca]"}`}>
+            <span className={`absolute top-1 size-5 rounded-full bg-white shadow-sm transition-transform ${saveToMealList ? "translate-x-[1.35rem]" : "translate-x-1"}`} />
           </span>
         </button>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:gap-3">
           <button
             type="button"
             onClick={onAccept}
-            disabled={isAccepting}
-            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border-2 border-[#20342d] bg-[#dbe8a7] px-5 text-sm font-black shadow-[0_4px_0_#20342d] transition enabled:hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-60"
+            disabled={isSubmitting || !result.name.trim()}
+            className="inline-flex min-h-12 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-br from-[#65b741] to-[#22945f] px-2 text-xs font-bold text-white shadow-[0_14px_28px_rgba(34,148,95,0.25)] transition enabled:hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-60 sm:gap-2 sm:px-5 sm:text-sm"
           >
-            {isAccepting ? <LoaderCircle className="size-5 animate-spin" /> : <Check className="size-5" />}
-            {isAccepting ? "Saving…" : "Accept response"}
+            {isSubmitting ? <LoaderCircle className="size-5 animate-spin" /> : <Check className="size-5" />}
+            {isSubmitting ? "Saving…" : "Accept response"}
           </button>
           <button
             type="button"
             onClick={onRetry}
-            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border-2 border-[#20342d] bg-white px-5 text-sm font-black shadow-[0_4px_0_#20342d] transition hover:-translate-y-0.5"
+            disabled={isSubmitting}
+            className="inline-flex min-h-12 items-center justify-center gap-1.5 rounded-xl bg-white px-2 text-xs font-bold text-[#253025] shadow-[0_12px_26px_rgba(56,103,43,0.12)] ring-1 ring-[#e1edd8] transition enabled:hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-60 sm:gap-2 sm:px-5 sm:text-sm"
           >
             <RefreshCcw className="size-4" /> Retry analysis
           </button>
@@ -592,12 +703,13 @@ function ResultStep({
           <button
             type="button"
             onClick={onReject}
-            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full border-2 border-[#20342d] bg-[#fff0e8] px-5 text-sm font-black transition hover:bg-[#ffd9c8]"
+            disabled={isSubmitting}
+            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#fff5ee] px-5 text-sm font-bold text-[#a94f35] ring-1 ring-[#f2d8ca] transition enabled:hover:bg-[#ffeadf] disabled:cursor-wait disabled:opacity-60"
           >
             <X className="size-5" /> Reject
           </button>
         </div>
-        <button type="button" onClick={onReject} className="mx-auto mt-5 flex items-center gap-2 text-xs font-black text-[#66766f] hover:text-[#20342d]">
+        <button type="button" onClick={onReject} disabled={isSubmitting} className="mx-auto mt-5 flex items-center gap-2 text-xs font-black text-[#66766f] hover:text-[#20342d] disabled:cursor-wait disabled:opacity-60">
           <RotateCcw className="size-3.5" /> Take a different photo
         </button>
       </div>

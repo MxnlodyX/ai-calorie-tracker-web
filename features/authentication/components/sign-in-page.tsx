@@ -1,17 +1,53 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { startGoogleSignIn } from "@/features/authentication/api";
+import { useGetMeQuery } from "@/store/api";
+
+function getResponseStatus(error: unknown): number | undefined {
+  if (error && typeof error === "object" && "status" in error) {
+    const status = error.status;
+    return typeof status === "number" ? status : undefined;
+  }
+
+  return undefined;
+}
 
 export function SignInPage() {
+  const router = useRouter();
+  const { data: user, error, isLoading, isFetching } = useGetMeQuery();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSigningIn, setIsSigningIn] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      router.replace("/dashboard");
+    }
+  }, [router, user]);
+
   const handleGoogleOAuthSignIn = () => {
     setIsSigningIn(true);
     setErrorMessage(null);
     startGoogleSignIn();
   };
+
+  if (isLoading || isFetching || user) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[#f7fbf3] px-5 text-[#172019]">
+        <p className="text-sm font-black" role="status">
+          Checking your session...
+        </p>
+      </main>
+    );
+  }
+
+  const sessionError =
+    error && getResponseStatus(error) !== 401
+      ? "We could not check your session. You can still try signing in with Google."
+      : null;
+
   return (
     <main className="relative grid min-h-screen place-items-center overflow-hidden bg-[#f7fbf3] px-5 py-8 text-[#172019]">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_14%,rgba(255,255,255,0.94),transparent_24%),radial-gradient(circle_at_82%_18%,rgba(165,223,127,0.52),transparent_26%),radial-gradient(circle_at_50%_100%,rgba(255,185,91,0.34),transparent_30%),linear-gradient(135deg,#fbfff7_0%,#edf8e7_48%,#d7f0c6_100%)]" />
@@ -46,8 +82,10 @@ export function SignInPage() {
             <GoogleIcon />
             {isSigningIn ? "Connecting..." : "Continue with Google"}
           </button>
-          {errorMessage && (
-            <p className="mt-4 text-center text-sm text-red-600">{errorMessage}</p>
+          {(errorMessage ?? sessionError) && (
+            <p className="mt-4 text-center text-sm text-red-600">
+              {errorMessage ?? sessionError}
+            </p>
           )}
           <p className="mx-auto mt-6 max-w-[300px] text-center text-xs leading-5 text-[#687566]">
             Your account is created or restored automatically using your Google profile.

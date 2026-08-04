@@ -39,20 +39,25 @@ export async function proxyBackendRequest({
   const response = await fetch(targetUrl, {
     method,
     headers,
+    credentials: "include",
     body: method === "GET" || method === "HEAD" ? undefined : request.body,
     duplex: "half",
   } as RequestInit);
 
   const responseHeaders = new Headers();
   const responseContentType = response.headers.get("content-type");
-  const setCookie = response.headers.get("set-cookie");
 
   if (responseContentType) {
     responseHeaders.set("content-type", responseContentType);
   }
 
-  if (setCookie) {
-    responseHeaders.set("set-cookie", setCookie);
+  for (const setCookie of response.headers.getSetCookie()) {
+    // The browser talks to this same-origin proxy, so a backend Domain attribute
+    // would point at the wrong host and cause the cookie to be rejected.
+    responseHeaders.append(
+      "set-cookie",
+      setCookie.replace(/;\s*Domain=[^;]+/gi, ""),
+    );
   }
 
   return new NextResponse(response.body, {

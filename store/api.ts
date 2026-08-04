@@ -5,6 +5,7 @@ import type {
   FoodItem,
   UpdateFoodPayload,
 } from "@/features/dashboard/types";
+import { API_BASE_URL } from "@/lib/api-url";
 
 export type DietMode = "lose" | "maintain" | "gain";
 
@@ -136,7 +137,7 @@ function unwrapFoodItem(response: FoodItem | LegacyMeal | ApiEnvelope<FoodItem |
 export const api = createApi({
   reducerPath: "api",
   baseQuery: fetchBaseQuery({
-    baseUrl: "/api",
+    baseUrl: API_BASE_URL,
     credentials: "include",
     prepareHeaders: (headers) => {
       headers.set("accept", "application/json");

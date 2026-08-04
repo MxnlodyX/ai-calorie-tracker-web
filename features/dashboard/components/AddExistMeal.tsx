@@ -77,13 +77,13 @@ export function AddExistMeal({
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-end bg-[#20342d]/45 p-3 sm:items-center sm:justify-center sm:p-6"
+      className="fixed inset-0 z-[100] flex items-end bg-[#172019]/35 p-3 backdrop-blur-sm sm:items-center sm:justify-center sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-labelledby="add-existing-meal-title"
     >
-      <section className="max-h-[calc(100vh-1.5rem)] w-full overflow-hidden rounded-[1.5rem] border-2 border-[#20342d] bg-white text-[#20342d] shadow-[0_8px_0_#20342d] sm:max-w-2xl">
-        <div className="border-b-2 border-[#20342d] bg-[#dbe8a7] p-4 sm:p-5">
+      <section className="app-panel max-h-[calc(100vh-1.5rem)] w-full overflow-hidden rounded-[28px] text-[#172019] sm:max-w-2xl">
+        <div className="border-b border-[#dce9d4] bg-gradient-to-br from-[#eef8e7] to-white/70 p-4 sm:p-5">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <p className="text-xs font-black uppercase tracking-[0.14em] text-[#b6532d]">
@@ -102,7 +102,7 @@ export function AddExistMeal({
             <button
               type="button"
               onClick={onClose}
-              className="grid size-10 shrink-0 place-items-center rounded-full border-2 border-[#20342d] bg-white text-[#20342d] shadow-[2px_2px_0_#20342d] transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#20342d]"
+              className="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-[#235b30] shadow-[0_8px_18px_rgba(56,103,43,0.1)] ring-1 ring-[#e1edd8] transition hover:-translate-y-0.5"
               aria-label="Close existing meal list"
             >
               <IconX className="size-5" aria-hidden="true" />
@@ -120,10 +120,10 @@ export function AddExistMeal({
                 <label
                   key={mealType}
                   className={[
-                    "flex min-h-11 cursor-pointer items-center justify-center rounded-[0.9rem] border-2 border-[#20342d] px-3 text-xs font-black shadow-[2px_2px_0_#20342d] transition hover:-translate-y-0.5",
+                    "flex min-h-11 cursor-pointer items-center justify-center rounded-xl px-3 text-xs font-bold ring-1 ring-[#dce9d4] transition hover:-translate-y-0.5",
                     selectedMealType === mealType
-                      ? "bg-[#ffdf5d]"
-                      : "bg-white text-[#66766f]",
+                      ? "bg-[#e8f7df] text-[#235b30] ring-[#65b741]"
+                      : "bg-white text-[#687566]",
                   ].join(" ")}
                 >
                   <input
@@ -142,7 +142,7 @@ export function AddExistMeal({
 
           <label className="mt-5 block">
             <span className="sr-only">Search saved meals</span>
-            <span className="flex min-h-12 items-center gap-2 rounded-[1rem] border-2 border-[#20342d] bg-[#f3fbf1] px-4 shadow-[0_3px_0_#20342d]">
+            <span className="app-field flex min-h-12 items-center gap-2 rounded-xl px-4">
               <IconSearch className="size-5 shrink-0" aria-hidden="true" />
               <input
                 type="search"
@@ -156,7 +156,7 @@ export function AddExistMeal({
 
           {errorMessage ? (
             <div
-              className="mt-4 rounded-[1rem] border-2 border-[#20342d] bg-[#fff0df] p-3 text-sm font-black text-[#20342d]"
+              className="mt-4 rounded-2xl bg-[#fff5ee] p-3 text-sm font-bold text-[#a94f35] ring-1 ring-[#f2d8ca]"
               role="status"
             >
               {errorMessage}
@@ -194,7 +194,7 @@ export function AddExistMeal({
                   setIsUpdatingMeal(false);
                 }
               }}
-              className="mt-5 rounded-[1rem] border-2 border-[#20342d] bg-[#fff7df] p-4 shadow-[3px_3px_0_#20342d]"
+              className="mt-5 rounded-[20px] bg-[#f1f8ec] p-4 ring-1 ring-[#dce9d4]"
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -211,7 +211,7 @@ export function AddExistMeal({
                     setEditingMeal(null);
                     setEditValues(null);
                   }}
-                  className="grid size-9 shrink-0 place-items-center rounded-full border-2 border-[#20342d] bg-white text-[#20342d] shadow-[2px_2px_0_#20342d] transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#20342d]"
+                  className="grid size-9 shrink-0 place-items-center rounded-xl bg-white text-[#235b30] shadow-sm ring-1 ring-[#e1edd8] transition hover:-translate-y-0.5"
                   aria-label="Close menu editor"
                 >
                   <IconX className="size-4" aria-hidden="true" />
@@ -229,7 +229,7 @@ export function AddExistMeal({
                         current ? { ...current, name: event.target.value } : current,
                       )
                     }
-                    className="mt-1 h-11 w-full rounded-[0.8rem] border-2 border-[#20342d] bg-white px-3 text-sm font-bold outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#20342d]"
+                    className="app-field mt-1 h-11 w-full rounded-xl px-3 text-sm font-bold outline-none"
                     required
                   />
                 </label>
@@ -246,7 +246,7 @@ export function AddExistMeal({
                           : current,
                       )
                     }
-                    className="mt-1 h-11 w-full rounded-[0.8rem] border-2 border-[#20342d] bg-white px-3 text-sm font-bold outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#20342d]"
+                    className="app-field mt-1 h-11 w-full rounded-xl px-3 text-sm font-bold outline-none"
                   />
                 </label>
 
@@ -265,7 +265,7 @@ export function AddExistMeal({
                             : current,
                         )
                       }
-                      className="mt-1 h-11 w-full rounded-[0.8rem] border-2 border-[#20342d] bg-white px-3 text-sm font-bold outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#20342d]"
+                      className="app-field mt-1 h-11 w-full rounded-xl px-3 text-sm font-bold outline-none"
                     >
                       {mealTypes.map((mealType) => (
                         <option key={mealType} value={mealType}>
@@ -288,7 +288,7 @@ export function AddExistMeal({
                             : current,
                         )
                       }
-                      className="mt-1 h-11 w-full rounded-[0.8rem] border-2 border-[#20342d] bg-white px-3 text-sm font-bold outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#20342d]"
+                      className="app-field mt-1 h-11 w-full rounded-xl px-3 text-sm font-bold outline-none"
                       required
                     />
                   </label>
@@ -311,7 +311,7 @@ export function AddExistMeal({
                               : current,
                           )
                         }
-                        className="mt-1 h-10 w-full rounded-[0.75rem] border-2 border-[#20342d] bg-white px-2 text-sm font-bold outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#20342d]"
+                        className="app-field mt-1 h-10 w-full rounded-xl px-2 text-sm font-bold outline-none"
                       />
                     </label>
                   ))}
@@ -321,7 +321,7 @@ export function AddExistMeal({
               <button
                 type="submit"
                 disabled={isUpdatingMeal}
-                className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full border-2 border-[#20342d] bg-[#ffdf5d] px-4 text-sm font-black shadow-[2px_2px_0_#20342d] transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#20342d] disabled:cursor-not-allowed disabled:bg-white disabled:text-[#66766f]"
+                className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-[#65b741] to-[#22945f] px-4 text-sm font-bold text-white shadow-[0_12px_24px_rgba(34,148,95,0.22)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <IconDeviceFloppy className="size-4" aria-hidden="true" />
                 {isUpdatingMeal ? "Saving..." : "Save changes"}
@@ -331,7 +331,7 @@ export function AddExistMeal({
 
           {isLoading ? (
             <div
-              className="mt-5 rounded-[1rem] border-2 border-[#20342d] bg-[#e9fbff] p-4 text-center"
+              className="mt-5 rounded-2xl bg-[#eef8e7] p-4 text-center ring-1 ring-[#dce9d4]"
               role="status"
             >
               <p className="text-sm font-black">Loading saved meals...</p>
@@ -344,12 +344,12 @@ export function AddExistMeal({
               {filteredMeals.map((meal) => (
                 <article
                   key={meal.id}
-                  className="flex flex-col rounded-[1.1rem] border-2 border-[#20342d] bg-[#fbfff9] p-3 shadow-[3px_3px_0_#20342d]"
+                  className="app-card flex flex-col rounded-[20px] p-3"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex min-w-0 items-start gap-3">
                       <span
-                        className={`grid size-12 shrink-0 place-items-center rounded-full border-2 border-[#20342d] ${meal.color}`}
+                        className={`grid size-12 shrink-0 place-items-center rounded-2xl text-[#235b30] ${meal.color}`}
                       >
                         <IconBowl className="size-6" aria-hidden="true" />
                       </span>
@@ -362,7 +362,7 @@ export function AddExistMeal({
                         </p>
                       </div>
                     </div>
-                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full border-2 border-[#20342d] bg-white px-2 py-1 text-xs font-black">
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#f1f8ec] px-2 py-1 text-xs font-bold text-[#235b30] ring-1 ring-[#dce9d4]">
                       <IconFlame className="size-4" aria-hidden="true" />
                       {meal.calories}
                     </span>
@@ -391,7 +391,7 @@ export function AddExistMeal({
                           });
                         }
                       }}
-                      className="inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-full border-2 border-[#20342d] bg-[#ffdf5d] px-3 text-xs font-black shadow-[2px_2px_0_#20342d] transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#20342d] disabled:cursor-not-allowed disabled:bg-white disabled:text-[#66766f]"
+                      className="inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-xl bg-gradient-to-br from-[#65b741] to-[#22945f] px-3 text-xs font-bold text-white shadow-[0_10px_20px_rgba(34,148,95,0.2)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <IconPlus className="size-4" aria-hidden="true" />
                       {isSavingMeal ? "Adding..." : `Add to ${selectedMealType}`}
@@ -402,7 +402,7 @@ export function AddExistMeal({
                         setEditingMeal(meal);
                         setEditValues(createMealFormValues(meal));
                       }}
-                      className="grid size-10 place-items-center rounded-full border-2 border-[#20342d] bg-white text-[#20342d] shadow-[2px_2px_0_#20342d] transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#20342d]"
+                      className="grid size-10 place-items-center rounded-xl bg-white text-[#235b30] ring-1 ring-[#dce9d4] transition hover:-translate-y-0.5"
                       aria-label={`Edit ${meal.name}`}
                     >
                       <IconEdit className="size-4" aria-hidden="true" />
@@ -419,7 +419,7 @@ export function AddExistMeal({
                           setDeletingMealId(null);
                         }
                       }}
-                      className="grid size-10 place-items-center rounded-full border-2 border-[#20342d] bg-white text-[#20342d] shadow-[2px_2px_0_#20342d] transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#20342d] disabled:cursor-not-allowed disabled:text-[#66766f]"
+                      className="grid size-10 place-items-center rounded-xl bg-white text-[#a94f35] ring-1 ring-[#f2d8ca] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
                       aria-label={`Remove ${meal.name} from saved meals`}
                     >
                       <IconTrash className="size-4" aria-hidden="true" />
@@ -429,7 +429,7 @@ export function AddExistMeal({
               ))}
             </div>
           ) : (
-            <div className="mt-5 rounded-[1rem] border-2 border-dashed border-[#20342d] bg-[#fff7df] p-4 text-center">
+            <div className="mt-5 rounded-2xl border border-dashed border-[#b8d4aa] bg-white/60 p-4 text-center">
               <p className="text-sm font-black">
                 {existingMeals.length === 0
                   ? "No saved meals yet"
@@ -450,7 +450,7 @@ export function AddExistMeal({
 
 function MacroValue({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-[0.75rem] border-2 border-[#20342d] bg-white px-2 py-2 text-center">
+    <div className="rounded-xl bg-[#f1f8ec] px-2 py-2 text-center ring-1 ring-[#e1edd8]">
       <p className="truncate text-[10px] font-black uppercase text-[#66766f]">
         {label}
       </p>
