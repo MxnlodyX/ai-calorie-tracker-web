@@ -272,7 +272,7 @@ export function ProfileMenu({ user }: ProfileMenuProps) {
       <button
         type="button"
         onClick={() => setIsOpen((current) => !current)}
-        className="flex rounded-full focus:outline-none focus:ring-2 focus:ring-[#153d35] focus:ring-offset-2"
+        className="flex rounded-2xl shadow-[0_10px_24px_rgba(56,103,43,0.14)] ring-1 ring-white focus:outline-none focus:ring-2 focus:ring-[#65b741] focus:ring-offset-2"
         aria-label="Open profile menu"
         aria-expanded={isOpen}
       >
@@ -282,17 +282,17 @@ export function ProfileMenu({ user }: ProfileMenuProps) {
             alt=""
             width={50}
             height={50}
-            className="size-12 rounded-full border border-zinc-200 object-cover"
+            className="size-12 rounded-2xl object-cover"
           />
         ) : (
-          <span className="flex size-12 items-center justify-center rounded-full border border-zinc-200 bg-white text-sm font-semibold text-zinc-700">
+          <span className="flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#65b741] to-[#22945f] text-sm font-bold text-white">
             {(latestProfile.name ?? latestProfile.email).charAt(0).toUpperCase()}
           </span>
         )}
       </button>
 
       {isOpen ? (
-        <div className="absolute right-0 top-14 z-50 w-56 rounded-lg border border-zinc-200 bg-white p-3 shadow-lg">
+        <div className="app-panel absolute right-0 top-14 z-50 w-60 rounded-[20px] p-3">
           <p className="truncate text-sm font-semibold text-zinc-950">
             {latestProfile.name ?? latestProfile.email}
           </p>
@@ -305,7 +305,7 @@ export function ProfileMenu({ user }: ProfileMenuProps) {
           <button
             type="button"
             onClick={openProfileModal}
-            className="mt-3 flex w-full items-center justify-center gap-2 rounded-md bg-[#153d35] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#102f29] focus:outline-none focus:ring-2 focus:ring-[#153d35] focus:ring-offset-2"
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-[#65b741] to-[#22945f] px-3 py-2.5 text-sm font-bold text-white shadow-[0_10px_20px_rgba(34,148,95,0.2)] transition hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-[#65b741] focus:ring-offset-2"
           >
             <UserCog className="size-4" aria-hidden="true" />
             Edit profile
@@ -319,10 +319,18 @@ export function ProfileMenu({ user }: ProfileMenuProps) {
                 title: "Signing out",
                 message: "Your session is closing.",
               });
-              await logout().catch(() => undefined);
-              window.location.href = "/";
+              try {
+                await logout();
+                window.location.href = "/";
+              } catch (error) {
+                showAlert({
+                  type: "error",
+                  title: "Could not sign out",
+                  message: getErrorMessage(error),
+                });
+              }
             }}
-            className="mt-3 w-full rounded-md border border-[#153d35] px-3 py-2 text-sm font-semibold text-[#153d35] transition hover:bg-[#f3fbf1] focus:outline-none focus:ring-2 focus:ring-[#153d35] focus:ring-offset-2"
+            className="mt-2 w-full rounded-xl bg-white px-3 py-2.5 text-sm font-bold text-[#235b30] ring-1 ring-[#dce9d4] transition hover:bg-[#f1f8ec] focus:outline-none focus:ring-2 focus:ring-[#65b741] focus:ring-offset-2"
           >
             Sign out
           </button>
