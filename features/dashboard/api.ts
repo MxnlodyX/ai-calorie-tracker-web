@@ -10,11 +10,11 @@ import type {
 } from "./types";
 
 const dashboardEndpoints = {
-  foods: (userId: string) => `/api/foods?userId=${encodeURIComponent(userId)}`,
-  food: (mealId: string) => `/api/foods/${encodeURIComponent(mealId)}`,
+  foods: (userId: string) => `/foods?userId=${encodeURIComponent(userId)}`,
+  food: (mealId: string) => `/foods/${encodeURIComponent(mealId)}`,
   foodLists: (userId: string) =>
-    `/api/food-lists?userId=${encodeURIComponent(userId)}`,
-  foodList: (mealId: string) => `/api/food-lists/${encodeURIComponent(mealId)}`,
+    `/food-lists?userId=${encodeURIComponent(userId)}`,
+  foodList: (mealId: string) => `/food-lists/${encodeURIComponent(mealId)}`,
 };
 
 type LegacyMeal = {
@@ -58,7 +58,7 @@ export async function getFoods(userId: string): Promise<FoodItem[]> {
 
 export function createFood(payload: CreateFoodPayload) {
   return apiPost<FoodItem | LegacyMeal, CreateFoodPayload>(
-    "/api/foods",
+    "/foods",
     payload,
   ).then(toFoodItem);
 }
@@ -80,7 +80,7 @@ export function getMenulists(userId: string) {
 
 export function createMenulist(payload: CreateMenulistPayload) {
   return apiPost<MenulistItem, CreateMenulistPayload>(
-    "/api/food-lists",
+    "/food-lists",
     payload,
   );
 }
