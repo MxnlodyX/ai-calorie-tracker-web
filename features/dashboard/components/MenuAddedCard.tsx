@@ -9,9 +9,9 @@ type MenuAddedCardProps = {
 export function MenuAddedCard({ meals }: MenuAddedCardProps) {
   if (meals.length === 0) {
     return (
-      <div className="mt-4 rounded-[1rem] border-2 border-dashed border-[#20342d] bg-white p-4 text-center">
-        <p className="text-sm font-black text-[#20342d]">No meals yet</p>
-        <p className="mt-1 text-xs font-bold text-[#65746d]">
+      <div className="mt-4 rounded-[18px] border border-dashed border-[#b8d4aa] bg-white/70 p-4 text-center">
+        <p className="text-sm font-bold text-[#172019]">No meals yet</p>
+        <p className="mt-1 text-xs text-[#687566]">
           Add an existing meal from your list.
         </p>
       </div>
@@ -23,24 +23,24 @@ export function MenuAddedCard({ meals }: MenuAddedCardProps) {
       {meals.map((meal) => (
         <div
           key={meal.id}
-          className="flex items-center justify-between gap-4 rounded-[1rem] border-2 border-[#20342d] bg-white p-3"
+          className="app-card flex items-center justify-between gap-4 rounded-[18px] p-3"
         >
           <div className="flex min-w-0 items-center gap-3">
             <span
-              className={`grid size-11 shrink-0 place-items-center rounded-full border-2 border-[#20342d] ${meal.color}`}
+              className={`grid size-11 shrink-0 place-items-center rounded-xl text-[#235b30] ${meal.color}`}
             >
               <IconCamera className="size-5" aria-hidden="true" />
             </span>
             <div className="min-w-0">
-              <p className="truncate text-sm font-black text-[#20342d]">
+              <p className="truncate text-sm font-bold text-[#172019]">
                 {meal.name}
               </p>
-              <p className="truncate text-sm font-medium text-[#65746d]">
+              <p className="truncate text-sm text-[#687566]">
                 {meal.mealType} - {meal.description}
               </p>
             </div>
           </div>
-          <p className="shrink-0 text-sm font-black text-[#20342d]">
+          <p className="shrink-0 text-sm font-bold text-[#235b30]">
             {meal.calories.toLocaleString()} kcal
           </p>
         </div>
