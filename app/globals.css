@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f6f5f0;
-  --foreground: #1f2528;
+  --background: #f7fbf3;
+  --foreground: #172019;
 }
 
 @theme inline {
@@ -15,6 +15,57 @@
 body {
   background: var(--background);
   color: var(--foreground);
+}
+
+.app-page {
+  background-color: #f7fbf3;
+  background-image:
+    linear-gradient(90deg, rgba(89, 132, 72, 0.065) 1px, transparent 1px),
+    linear-gradient(rgba(89, 132, 72, 0.065) 1px, transparent 1px),
+    radial-gradient(circle at 12% 5%, rgba(255, 255, 255, 0.98), transparent 25%),
+    radial-gradient(circle at 88% 12%, rgba(165, 223, 127, 0.45), transparent 28%),
+    radial-gradient(circle at 50% 100%, rgba(255, 185, 91, 0.24), transparent 32%),
+    linear-gradient(135deg, #fbfff7 0%, #edf8e7 50%, #dff2d1 100%);
+  background-size: 58px 58px, 58px 58px, auto, auto, auto, auto;
+  padding-bottom: calc(7.5rem + env(safe-area-inset-bottom));
+}
+
+@media (max-width: 639px) {
+  .app-page {
+    background-size: 42px 42px, 42px 42px, auto, auto, auto, auto;
+  }
+
+  .app-panel {
+    box-shadow: 0 14px 38px rgba(56, 103, 43, 0.12);
+  }
+
+  .app-card {
+    box-shadow: 0 8px 22px rgba(56, 103, 43, 0.08);
+  }
+}
+
+.app-panel {
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 24px 64px rgba(56, 103, 43, 0.14);
+  backdrop-filter: blur(18px);
+}
+
+.app-card {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #e1edd8;
+  box-shadow: 0 14px 34px rgba(56, 103, 43, 0.1);
+}
+
+.app-field {
+  border: 1px solid #dce9d4;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 8px 20px rgba(56, 103, 43, 0.06);
+}
+
+.app-field:focus {
+  border-color: #65b741;
+  box-shadow: 0 0 0 3px rgba(101, 183, 65, 0.16);
 }
 
 @keyframes scan {
