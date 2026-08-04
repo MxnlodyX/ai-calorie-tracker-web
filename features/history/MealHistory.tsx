@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import {
   IconCalendarStats as IconCalendarMonth,
   IconClock,
@@ -104,10 +104,6 @@ const monthOptions = [
   { value: 12, label: "December" },
 ];
 const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const today = new Date();
-const currentMonth = today.getMonth() + 1;
-const currentYear = today.getFullYear();
-const currentDay = today.getDate();
 const yearWindow = 5;
 
 const stats: Stat[] = [
@@ -115,7 +111,7 @@ const stats: Stat[] = [
     key: "totalCalories",
     label: "Total",
     Icon: IconFlame,
-    color: "bg-[#ffdf5d]",
+    color: "bg-[#fff4c7]",
     getValue: (day) => day.totalCalories.toLocaleString(),
     suffix: "kcal",
   },
@@ -123,7 +119,7 @@ const stats: Stat[] = [
     key: "averageCalories",
     label: "Average",
     Icon: IconTrendingUp,
-    color: "bg-[#dbe8a7]",
+    color: "bg-[#e8f7df]",
     getValue: (day) => {
       if (day.meals.length === 0) {
         return "0";
@@ -137,7 +133,7 @@ const stats: Stat[] = [
     key: "mealsLogged",
     label: "Meals",
     Icon: IconSalad,
-    color: "bg-[#bff4ff]",
+    color: "bg-[#e3f5dc]",
     getValue: (day) => day.meals.length.toString(),
     suffix: "logged",
   },
@@ -151,6 +147,7 @@ function getMonthOptionLabel(month: number) {
 }
 
 function getYearOptions(selectedYear: number) {
+  const currentYear = new Date().getFullYear();
   const minYear = Math.min(currentYear - yearWindow, selectedYear);
   const maxYear = Math.max(currentYear + yearWindow, selectedYear);
 
@@ -184,11 +181,11 @@ function createEmptyDiaryDay(
   };
 }
 
-function formatDateKey(value: string) {
+function formatDateKey(value: string): string | null {
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
-    return formatLocalDate(new Date());
+    return null;
   }
 
   return formatLocalDate(date);
@@ -258,6 +255,10 @@ function foodListToDiaryDays(
     (entries, item) => {
       const dateKey = formatDateKey(item.eatenAt);
 
+      if (!dateKey) {
+        return entries;
+      }
+
       entries[dateKey] = entries[dateKey] ?? [];
       entries[dateKey].push(foodToMealEntry(item));
 
@@ -324,9 +325,13 @@ export function MealHistory() {
   const { data: user, isLoading: isLoadingUser } = useGetMeQuery();
   const activeUserId = user?.id ?? "";
   const dailyGoalCalories = user?.kcalGoal ?? null;
-  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
-  const [selectedYear, setSelectedYear] = useState(currentYear);
-  const [selectedDayNumber, setSelectedDayNumber] = useState(currentDay);
+  const [selectedMonth, setSelectedMonth] = useState(
+    () => new Date().getMonth() + 1,
+  );
+  const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
+  const [selectedDayNumber, setSelectedDayNumber] = useState(
+    () => new Date().getDate(),
+  );
   const [editingMeal, setEditingMeal] = useState<EditingMeal | null>(null);
   const [mealFormValues, setMealFormValues] = useState<MealFormValues | null>(
     null,
@@ -334,6 +339,23 @@ export function MealHistory() {
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(
     null,
   );
+
+  useEffect(() => {
+    let previousDate = formatLocalDate(new Date());
+    const timer = window.setInterval(() => {
+      const now = new Date();
+      const nextDate = formatLocalDate(now);
+
+      if (nextDate !== previousDate) {
+        previousDate = nextDate;
+        setSelectedMonth(now.getMonth() + 1);
+        setSelectedYear(now.getFullYear());
+        setSelectedDayNumber(now.getDate());
+      }
+    }, 60_000);
+
+    return () => window.clearInterval(timer);
+  }, []);
   const {
     data: foodItems = [],
     isLoading: isLoadingHistory,
@@ -527,22 +549,22 @@ export function MealHistory() {
   };
 
   return (
-    <main className="min-h-screen bg-[#fff7df] px-4 pb-28 pt-5 text-[#20342d] sm:px-6 lg:px-10">
+    <main className="app-page min-h-screen px-3.5 pt-4 text-[#172019] sm:px-6 sm:pt-5 lg:px-10 lg:pt-8">
       <section className="mx-auto w-full max-w-3xl">
-        <header className="flex items-start justify-between gap-4">
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.16em] text-[#b6532d]">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#22945f]">
               Meal diary
             </p>
-            <h1 className="mt-2 text-3xl font-black leading-tight sm:text-4xl">
+            <h1 className="mt-1 text-2xl font-bold leading-tight sm:mt-2 sm:text-4xl">
               {selectedMonthLabel}
             </h1>
-            <p className="mt-1 text-sm font-bold text-[#66766f]">
+            <p className="mt-0.5 text-xs text-[#687566] sm:mt-1 sm:text-sm">
               Pick a day to review meals and calories.
             </p>
           </div>
 
-          <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+          <div className="grid w-full shrink-0 grid-cols-[minmax(0,1fr)_7rem] gap-2 sm:flex sm:w-auto sm:flex-row">
             <label className="sr-only" htmlFor="diary-month">
               Select month
             </label>
@@ -550,7 +572,7 @@ export function MealHistory() {
               id="diary-month"
               value={selectedMonth}
               onChange={(event) => handleMonthChange(Number(event.target.value))}
-              className="h-11 rounded-full border-2 border-[#20342d] bg-white px-3 text-sm font-black shadow-[0_4px_0_#20342d] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#20342d]"
+              className="app-field h-12 w-full rounded-xl px-3 text-sm font-bold outline-none sm:h-11 sm:w-auto"
             >
               {monthOptions.map((month) => (
                 <option key={month.value} value={month.value}>
@@ -566,7 +588,7 @@ export function MealHistory() {
               id="diary-year"
               value={selectedYear}
               onChange={(event) => handleYearChange(Number(event.target.value))}
-              className="h-11 rounded-full border-2 border-[#20342d] bg-white px-3 text-sm font-black shadow-[0_4px_0_#20342d] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#20342d]"
+              className="app-field h-12 w-full rounded-xl px-3 text-sm font-bold outline-none sm:h-11 sm:w-auto"
             >
               {yearOptions.map((year) => (
                 <option key={year} value={year}>
@@ -579,44 +601,44 @@ export function MealHistory() {
 
         {entriesError ? (
           <div
-            className="mt-5 rounded-[1rem] border-2 border-[#20342d] bg-[#fff0df] p-4 text-center shadow-[0_4px_0_#20342d]"
+            className="mt-5 rounded-2xl bg-[#fff5ee] p-4 text-center shadow-[0_12px_26px_rgba(160,79,53,0.08)] ring-1 ring-[#f2d8ca]"
             role="status"
           >
-            <p className="text-sm font-black">History could not load</p>
-            <p className="mt-1 text-xs font-bold text-[#66766f]">
+            <p className="text-sm font-bold">History could not load</p>
+            <p className="mt-1 text-xs text-[#687566]">
               {entriesError}
             </p>
           </div>
         ) : isLoadingEntries ? (
           <div
-            className="mt-5 rounded-[1rem] border-2 border-[#20342d] bg-white p-4 text-center shadow-[0_4px_0_#20342d]"
+            className="app-card mt-5 rounded-2xl p-4 text-center"
             role="status"
           >
-            <p className="text-sm font-black">Loading meal history...</p>
-            <p className="mt-1 text-xs font-bold text-[#66766f]">
+            <p className="text-sm font-bold">Loading meal history...</p>
+            <p className="mt-1 text-xs text-[#687566]">
               Syncing your logged meals.
             </p>
           </div>
         ) : null}
 
-        <section className="mt-5 rounded-[1.5rem] border-2 border-[#20342d] bg-white p-3 shadow-[0_8px_0_#20342d] sm:p-5">
-          <div className="flex items-center gap-3 px-1">
-            <span className="grid size-10 place-items-center rounded-full border-2 border-[#20342d] bg-[#dbe8a7]">
+        <section className="app-panel mt-4 rounded-[24px] p-2.5 sm:mt-6 sm:rounded-[30px] sm:p-5">
+          <div className="flex items-center gap-2 px-1 sm:gap-3">
+            <span className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-[#65b741] to-[#22945f] text-white shadow-[0_10px_22px_rgba(34,148,95,0.22)] sm:size-10 sm:rounded-2xl">
               <IconCalendarMonth className="size-5" aria-hidden="true" />
             </span>
             <div>
-              <h2 className="text-sm font-black">{selectedMonthLabel}</h2>
-              <p className="text-xs font-bold text-[#66766f]">
+              <h2 className="text-sm font-bold">{selectedMonthLabel}</h2>
+              <p className="text-xs text-[#687566]">
                 Daily calorie diary
               </p>
             </div>
           </div>
 
-          <div className="mt-4 grid grid-cols-7 gap-1.5">
+          <div className="mt-3 grid grid-cols-7 gap-1 sm:mt-4 sm:gap-1.5">
             {weekdays.map((weekday) => (
               <p
                 key={weekday}
-                className="text-center text-[10px] font-black uppercase text-[#66766f]"
+                className="text-center text-[10px] font-bold uppercase text-[#687566]"
               >
                 {weekday}
               </p>
@@ -638,15 +660,15 @@ export function MealHistory() {
                   onClick={() => setSelectedDayNumber(day)}
                   aria-pressed={isSelected}
                   className={[
-                    "relative aspect-square rounded-[0.85rem] border-2 border-[#20342d] text-sm font-black transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#20342d]",
+                    "relative aspect-square min-h-10 rounded-[10px] text-xs font-bold ring-1 ring-[#dce9d4] transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65b741] sm:min-h-0 sm:rounded-xl sm:text-sm",
                     isSelected
-                      ? "bg-[#ffdf5d] shadow-[0_3px_0_#20342d]"
-                      : "bg-[#f3fbf1] hover:-translate-y-0.5",
+                      ? "bg-gradient-to-br from-[#65b741] to-[#22945f] text-white shadow-[0_8px_16px_rgba(34,148,95,0.22)]"
+                      : "bg-white/75 hover:-translate-y-0.5 hover:bg-[#eef8e7]",
                   ].join(" ")}
                 >
                   <span>{day}</span>
                   {hasMeals ? (
-                    <span className="absolute bottom-1 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-[#b6532d]" />
+                    <span className={`absolute bottom-1 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full ${isSelected ? "bg-white" : "bg-[#f29d38]"}`} />
                   ) : null}
                 </button>
               );
@@ -654,47 +676,47 @@ export function MealHistory() {
           </div>
         </section>
 
-        <section className="mt-5 rounded-[1.5rem] border-2 border-[#20342d] bg-white p-4 shadow-[0_10px_0_#20342d] sm:p-6">
+        <section className="app-panel mt-4 rounded-[24px] p-3 sm:mt-5 sm:rounded-[30px] sm:p-6">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.14em] text-[#b6532d]">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#22945f]">
                 {selectedDay.weekday}
               </p>
-              <h2 className="mt-1 text-2xl font-black leading-none">
+              <h2 className="mt-1 text-xl font-bold leading-none sm:text-2xl">
                 {monthLabel} {selectedDay.day}
               </h2>
             </div>
-            <span className="rounded-full border-2 border-[#20342d] bg-[#fff7df] px-3 py-1 text-xs font-black">
+            <span className="rounded-full bg-[#eef8e7] px-3 py-1 text-xs font-bold text-[#235b30] ring-1 ring-[#dce9d4]">
               {hasDailyGoal ? `${goalProgress}% goal` : "No goal set"}
             </span>
           </div>
 
-          <div className="mt-4 grid grid-cols-3 overflow-hidden rounded-[1rem] border-2 border-[#20342d] bg-[#fbfff9] shadow-[3px_3px_0_#20342d]">
+          <div className="app-card mt-3 grid grid-cols-3 overflow-hidden rounded-[18px] sm:mt-4 sm:rounded-[20px]">
             {stats.map((stat) => {
               const Icon = stat.Icon;
 
               return (
                 <div
                   key={stat.key}
-                  className="border-r-2 border-[#20342d] p-3 last:border-r-0"
+                  className="border-r border-[#e1edd8] p-2 last:border-r-0 sm:p-3"
                 >
                   <div className="flex min-w-0 items-center gap-2">
                     <span
-                      className={`grid size-8 shrink-0 place-items-center rounded-full border-2 border-[#20342d] ${stat.color}`}
+                      className={`hidden size-8 shrink-0 place-items-center rounded-xl text-[#235b30] sm:grid ${stat.color}`}
                     >
                       <Icon className="size-4" aria-hidden="true" />
                     </span>
                     <div className="min-w-0">
-                      <p className="truncate text-[10px] font-black uppercase tracking-[0.1em] text-[#66766f]">
+                      <p className="truncate text-[10px] font-bold uppercase tracking-[0.1em] text-[#687566]">
                         {stat.label}
                       </p>
-                      <p className="mt-1 truncate text-xl font-black leading-none text-[#20342d]">
+                      <p className="mt-1 truncate text-base font-bold leading-none text-[#172019] sm:text-xl">
                         {stat.getValue(selectedDay)}
                       </p>
                     </div>
                   </div>
 
-                  <p className="mt-2 truncate text-[10px] font-black uppercase text-[#66766f]">
+                  <p className="mt-2 truncate text-[10px] font-bold uppercase text-[#687566]">
                     {stat.suffix}
                   </p>
                 </div>
@@ -702,8 +724,8 @@ export function MealHistory() {
             })}
           </div>
 
-          <div className="mt-5 rounded-[1.25rem] border-2 border-[#20342d] bg-[#20342d] p-4 text-white">
-            <div className="flex items-center justify-between text-xs font-black">
+          <div className="mt-4 rounded-[18px] bg-gradient-to-br from-[#235b30] via-[#22945f] to-[#65b741] p-3 text-white shadow-[0_16px_34px_rgba(34,148,95,0.2)] sm:mt-5 sm:rounded-[22px] sm:p-4">
+            <div className="flex items-center justify-between text-xs font-bold">
               <span>Daily goal</span>
               <span>
                 {selectedDay.totalCalories.toLocaleString()} /{" "}
@@ -712,25 +734,25 @@ export function MealHistory() {
                   : "No goal set"}
               </span>
             </div>
-            <div className="mt-2 h-4 overflow-hidden rounded-full border-2 border-white bg-white/10">
+            <div className="mt-2 h-3 overflow-hidden rounded-full bg-white/20 ring-1 ring-white/25">
               <div
-                className="h-full rounded-r-full bg-[#52c79f]"
+                className="h-full rounded-full bg-[#c9f087]"
                 style={{ width: `${goalProgress}%` }}
               />
             </div>
-            <p className="mt-3 text-xs font-bold text-white/70">
+            <p className="mt-3 text-xs text-white/70">
               {selectedDay.note}
             </p>
           </div>
 
-          <section className="mt-5">
+          <section className="mt-4 sm:mt-5">
             <div className="flex items-center gap-3">
-              <span className="grid size-10 place-items-center rounded-full border-2 border-[#20342d] bg-[#bff4ff]">
+              <span className="grid size-10 place-items-center rounded-xl bg-[#e8f7df] text-[#22945f] ring-1 ring-[#dce9d4]">
                 <IconHistory className="size-5" aria-hidden="true" />
               </span>
               <div>
-                <h2 className="text-sm font-black">Diary meals</h2>
-                <p className="text-xs font-bold text-[#66766f]">
+                <h2 className="text-sm font-bold">Diary meals</h2>
+                <p className="text-xs text-[#687566]">
                   {selectedDay.meals.length} entries for this day
                 </p>
               </div>
@@ -741,11 +763,11 @@ export function MealHistory() {
                 {selectedDay.meals.map((meal) => (
                   <article
                     key={meal.id}
-                    className="rounded-[1.1rem] border-2 border-[#20342d] bg-white p-3 shadow-[3px_3px_0_#20342d]"
+                    className="app-card rounded-[18px] p-3 sm:rounded-[20px]"
                   >
                     <div className="flex items-start gap-3">
                       <span
-                        className={`grid size-12 shrink-0 place-items-center rounded-full border-2 border-[#20342d] ${meal.accentColor}`}
+                        className={`grid size-10 shrink-0 place-items-center rounded-xl text-[#235b30] sm:size-12 sm:rounded-2xl ${meal.accentColor}`}
                       >
                         <IconSalad className="size-6" aria-hidden="true" />
                       </span>
@@ -753,17 +775,17 @@ export function MealHistory() {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <h3 className="truncate text-base font-black">
+                            <h3 className="truncate text-base font-bold">
                               {meal.title}
                             </h3>
-                            <p className="mt-1 flex items-center gap-1.5 text-xs font-bold text-[#66766f]">
+                            <p className="mt-1 flex items-center gap-1.5 text-xs text-[#687566]">
                               <IconClock className="size-4" aria-hidden="true" />
                               {meal.mealType} - {meal.time}
                             </p>
                           </div>
-                          <p className="shrink-0 text-right text-lg font-black">
+                          <p className="shrink-0 text-right text-lg font-bold text-[#235b30]">
                             {meal.calories}
-                            <span className="block text-xs font-bold text-[#66766f]">
+                            <span className="block text-xs text-[#687566]">
                               kcal
                             </span>
                           </p>
@@ -784,7 +806,7 @@ export function MealHistory() {
                             onClick={() =>
                               handleOpenEditMeal(selectedDay.date, meal)
                             }
-                            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border-2 border-[#20342d] bg-[#ffdf5d] px-3 text-xs font-black text-[#20342d] shadow-[2px_2px_0_#20342d] transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#20342d]"
+                            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#eef8e7] px-3 text-xs font-bold text-[#235b30] ring-1 ring-[#dce9d4] transition hover:-translate-y-0.5 hover:bg-[#e3f3da] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65b741]"
                           >
                             <IconEdit className="size-4" aria-hidden="true" />
                             Edit
@@ -794,7 +816,7 @@ export function MealHistory() {
                             onClick={() =>
                               handleOpenDeleteMeal(selectedDay.date, meal)
                             }
-                            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border-2 border-[#20342d] bg-white px-3 text-xs font-black text-[#20342d] shadow-[2px_2px_0_#20342d] transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#20342d]"
+                            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-white px-3 text-xs font-bold text-[#a94f35] ring-1 ring-[#f2d8ca] transition hover:-translate-y-0.5 hover:bg-[#fff5ee] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e77755]"
                           >
                             <IconTrash className="size-4" aria-hidden="true" />
                             Delete
@@ -806,9 +828,9 @@ export function MealHistory() {
                 ))}
               </div>
             ) : (
-              <div className="mt-4 rounded-[1.1rem] border-2 border-dashed border-[#20342d] bg-[#fff7df] p-4 text-center">
-                <p className="text-sm font-black">No meals logged</p>
-                <p className="mt-1 text-xs font-bold text-[#66766f]">
+              <div className="mt-4 rounded-[20px] border border-dashed border-[#b8d4aa] bg-white/60 p-4 text-center">
+                <p className="text-sm font-bold">No meals logged</p>
+                <p className="mt-1 text-xs text-[#687566]">
                   Choose another day or add a meal from the Analyze screen.
                 </p>
               </div>
@@ -819,23 +841,23 @@ export function MealHistory() {
 
       {editingMeal && mealFormValues ? (
         <div
-          className="fixed inset-0 z-[100] flex items-end bg-[#20342d]/45 p-3 sm:items-center sm:justify-center sm:p-6"
+          className="fixed inset-0 z-[100] flex items-end bg-[#172019]/35 p-3 backdrop-blur-sm sm:items-center sm:justify-center sm:p-6"
           role="dialog"
           aria-modal="true"
           aria-labelledby="edit-history-meal-title"
         >
           <form
             onSubmit={handleEditMealSubmit}
-            className="max-h-[calc(100vh-1.5rem)] w-full overflow-y-auto rounded-[1.5rem] border-2 border-[#20342d] bg-white p-4 text-[#20342d] shadow-[0_8px_0_#20342d] sm:max-w-lg sm:p-5"
+            className="app-panel max-h-[calc(100vh-1.5rem)] w-full overflow-y-auto rounded-[28px] p-4 text-[#172019] sm:max-w-lg sm:p-5"
           >
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs font-black uppercase tracking-[0.14em] text-[#b6532d]">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#22945f]">
                   Edit history
                 </p>
                 <h2
                   id="edit-history-meal-title"
-                  className="mt-1 text-2xl font-black leading-tight"
+                  className="mt-1 text-2xl font-bold leading-tight"
                 >
                   Update meal
                 </h2>
@@ -843,7 +865,7 @@ export function MealHistory() {
               <button
                 type="button"
                 onClick={handleCloseEditMeal}
-                className="grid size-10 shrink-0 place-items-center rounded-full border-2 border-[#20342d] bg-white text-[#20342d] shadow-[2px_2px_0_#20342d] transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#20342d]"
+                className="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-[#235b30] shadow-[0_8px_18px_rgba(56,103,43,0.1)] ring-1 ring-[#e1edd8] transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65b741]"
                 aria-label="Close meal editor"
               >
                 <IconX className="size-5" aria-hidden="true" />
@@ -852,7 +874,7 @@ export function MealHistory() {
 
             <div className="mt-5 space-y-4">
               <label className="block">
-                <span className="text-sm font-black">Meal name</span>
+                <span className="text-sm font-bold">Meal name</span>
                 <input
                   type="text"
                   value={mealFormValues.title}
@@ -863,14 +885,14 @@ export function MealHistory() {
                         : current,
                     )
                   }
-                  className="mt-2 h-12 w-full rounded-[0.9rem] border-2 border-[#20342d] bg-[#f3fbf1] px-3 text-sm font-bold outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#20342d]"
+                  className="app-field mt-2 h-12 w-full rounded-xl px-3 text-sm font-bold outline-none"
                   required
                 />
               </label>
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="block">
-                  <span className="text-sm font-black">Meal type</span>
+                  <span className="text-sm font-bold">Meal type</span>
                   <select
                     value={mealFormValues.mealType}
                     onChange={(event) =>
@@ -880,7 +902,7 @@ export function MealHistory() {
                           : current,
                       )
                     }
-                    className="mt-2 h-12 w-full rounded-[0.9rem] border-2 border-[#20342d] bg-white px-3 text-sm font-bold outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#20342d]"
+                    className="app-field mt-2 h-12 w-full rounded-xl px-3 text-sm font-bold outline-none"
                   >
                     {["Breakfast", "Lunch", "Dinner", "Additional"].map(
                       (mealType) => (
@@ -893,7 +915,7 @@ export function MealHistory() {
                 </label>
 
                 <label className="block">
-                  <span className="text-sm font-black">Time</span>
+                  <span className="text-sm font-bold">Time</span>
                   <input
                     type="time"
                     value={mealFormValues.time}
@@ -904,14 +926,14 @@ export function MealHistory() {
                           : current,
                       )
                     }
-                    className="mt-2 h-12 w-full rounded-[0.9rem] border-2 border-[#20342d] bg-white px-3 text-sm font-bold outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#20342d]"
+                    className="app-field mt-2 h-12 w-full rounded-xl px-3 text-sm font-bold outline-none"
                     required
                   />
                 </label>
               </div>
 
               <label className="block">
-                <span className="text-sm font-black">Calories</span>
+                <span className="text-sm font-bold">Calories</span>
                 <input
                   type="number"
                   min="1"
@@ -923,7 +945,7 @@ export function MealHistory() {
                         : current,
                     )
                   }
-                  className="mt-2 h-12 w-full rounded-[0.9rem] border-2 border-[#20342d] bg-[#fff7df] px-3 text-sm font-bold outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#20342d]"
+                  className="app-field mt-2 h-12 w-full rounded-xl px-3 text-sm font-bold outline-none"
                   required
                 />
               </label>
@@ -931,7 +953,7 @@ export function MealHistory() {
               <div className="grid grid-cols-3 gap-2">
                 {(["protein", "carbs", "fat"] as const).map((macro) => (
                   <label key={macro} className="block">
-                    <span className="text-xs font-black capitalize text-[#66766f]">
+                    <span className="text-xs font-bold capitalize text-[#687566]">
                       {macro} (g)
                     </span>
                     <input
@@ -945,7 +967,7 @@ export function MealHistory() {
                             : current,
                         )
                       }
-                      className="mt-1 h-11 w-full rounded-[0.8rem] border-2 border-[#20342d] bg-white px-2 text-sm font-bold outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#20342d]"
+                      className="app-field mt-1 h-11 w-full rounded-xl px-2 text-sm font-bold outline-none"
                     />
                   </label>
                 ))}
@@ -955,7 +977,7 @@ export function MealHistory() {
             <button
               type="submit"
               disabled={isSavingMeal}
-              className="mt-6 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full border-2 border-[#20342d] bg-[#ffdf5d] px-4 py-2 text-sm font-black shadow-[0_4px_0_#20342d] transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#20342d] disabled:cursor-not-allowed disabled:bg-white disabled:text-[#66766f]"
+              className="mt-6 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-[#65b741] to-[#22945f] px-4 py-2 text-sm font-bold text-white shadow-[0_14px_28px_rgba(34,148,95,0.25)] transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65b741] disabled:cursor-not-allowed disabled:opacity-60"
             >
               <IconDeviceFloppy className="size-5" aria-hidden="true" />
               {isSavingMeal ? "Saving..." : "Save changes"}
@@ -1006,32 +1028,32 @@ function ConfirmActionDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[120] flex items-end bg-[#20342d]/55 p-3 sm:items-center sm:justify-center sm:p-6"
+      className="fixed inset-0 z-[120] flex items-end bg-[#172019]/35 p-3 backdrop-blur-sm sm:items-center sm:justify-center sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-labelledby="confirm-history-action-title"
     >
-      <section className="w-full rounded-[1.5rem] border-2 border-[#20342d] bg-white p-4 text-[#20342d] shadow-[0_8px_0_#20342d] sm:max-w-md sm:p-5">
+      <section className="app-panel w-full rounded-[28px] p-4 text-[#172019] sm:max-w-md sm:p-5">
         <div className="flex items-start gap-3">
           <span
             className={[
-              "grid size-11 shrink-0 place-items-center rounded-full border-2 border-[#20342d]",
-              isDelete ? "bg-[#fff0df]" : "bg-[#ffdf5d]",
+              "grid size-11 shrink-0 place-items-center rounded-2xl",
+              isDelete ? "bg-[#fff0df] text-[#a94f35]" : "bg-[#e8f7df] text-[#22945f]",
             ].join(" ")}
           >
             <IconAlertTriangle className="size-6" aria-hidden="true" />
           </span>
           <div className="min-w-0">
-            <p className="text-xs font-black uppercase tracking-[0.14em] text-[#b6532d]">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#22945f]">
               Confirm action
             </p>
             <h2
               id="confirm-history-action-title"
-              className="mt-1 text-xl font-black leading-tight"
+              className="mt-1 text-xl font-bold leading-tight"
             >
               {isDelete ? "Delete this meal?" : "Save these changes?"}
             </h2>
-            <p className="mt-2 text-sm font-bold leading-6 text-[#66766f]">
+            <p className="mt-2 text-sm leading-6 text-[#687566]">
               {isDelete
                 ? `${mealTitle} will be removed from this day.`
                 : `${mealTitle} will be updated in your meal history.`}
@@ -1044,7 +1066,7 @@ function ConfirmActionDialog({
             type="button"
             onClick={onCancel}
             disabled={isSaving}
-            className="inline-flex min-h-11 items-center justify-center rounded-full border-2 border-[#20342d] bg-white px-4 text-sm font-black shadow-[0_4px_0_#20342d] transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#20342d]"
+            className="inline-flex min-h-11 items-center justify-center rounded-xl bg-white px-4 text-sm font-bold text-[#253025] shadow-[0_10px_22px_rgba(56,103,43,0.1)] ring-1 ring-[#e1edd8] transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65b741]"
           >
             Cancel
           </button>
@@ -1053,8 +1075,8 @@ function ConfirmActionDialog({
             onClick={onConfirm}
             disabled={isSaving}
             className={[
-              "inline-flex min-h-11 items-center justify-center rounded-full border-2 border-[#20342d] px-4 text-sm font-black shadow-[0_4px_0_#20342d] transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#20342d] disabled:cursor-not-allowed disabled:bg-white disabled:text-[#66766f]",
-              isDelete ? "bg-[#fff0df]" : "bg-[#ffdf5d]",
+              "inline-flex min-h-11 items-center justify-center rounded-xl px-4 text-sm font-bold transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-60",
+              isDelete ? "bg-[#fff0df] text-[#a94f35] ring-1 ring-[#f2d8ca] focus-visible:outline-[#e77755]" : "bg-gradient-to-br from-[#65b741] to-[#22945f] text-white shadow-[0_12px_24px_rgba(34,148,95,0.24)] focus-visible:outline-[#65b741]",
             ].join(" ")}
           >
             {isSaving ? "Saving..." : isDelete ? "Delete meal" : "Save changes"}
@@ -1067,11 +1089,11 @@ function ConfirmActionDialog({
 
 function MacroPill({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-full border-2 border-[#20342d] bg-[#fff7df] px-2 py-1 text-center">
-      <p className="truncate text-[10px] font-black uppercase text-[#66766f]">
+    <div className="rounded-xl bg-[#f1f8ec] px-2 py-1 text-center ring-1 ring-[#e1edd8]">
+      <p className="truncate text-[10px] font-bold uppercase text-[#687566]">
         {label}
       </p>
-      <p className="text-xs font-black">{value}g</p>
+      <p className="text-xs font-bold text-[#235b30]">{value}g</p>
     </div>
   );
 }
