@@ -117,28 +117,29 @@ export function AddManualMeal({
       color: "bg-[#ffdf5d]",
     };
 
-    if (saveToExistingList) {
-      const wasSavedToBackend = await onSaveExistingMeal({
-        ...meal,
-        id: `saved-${meal.id}`,
-      });
-
-      if (!wasSavedToBackend) {
-        return;
-      }
-    }
-
     const wasLogged = await onAddMeal(meal);
 
     if (!wasLogged) {
       return;
     }
 
+    let wasSavedToBackend = false;
+
+    if (saveToExistingList) {
+      wasSavedToBackend = await onSaveExistingMeal({
+        ...meal,
+        id: `saved-${meal.id}`,
+      });
+    }
+
     showAlert({
-      title: saveToExistingList ? "Meal saved and logged" : "Meal logged",
-      message: saveToExistingList
+      type: saveToExistingList && !wasSavedToBackend ? "info" : "success",
+      title: wasSavedToBackend ? "Meal saved and logged" : "Meal logged",
+      message: wasSavedToBackend
         ? `${meal.name} was added to today and saved for reuse.`
-        : `${meal.name} was added to today's log.`,
+        : saveToExistingList
+          ? `${meal.name} was logged, but could not be saved for reuse.`
+          : `${meal.name} was added to today's log.`,
     });
     setFormValues(defaultFormValues);
     setFormErrors({});
@@ -148,14 +149,14 @@ export function AddManualMeal({
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-end bg-[#20342d]/45 p-3 sm:items-center sm:justify-center sm:p-6"
+      className="fixed inset-0 z-[100] flex items-end bg-[#172019]/35 p-3 backdrop-blur-sm sm:items-center sm:justify-center sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-labelledby="add-manual-meal-title"
     >
       <form
         onSubmit={handleSubmit}
-        className="max-h-[calc(100vh-1.5rem)] w-full overflow-y-auto rounded-[1.5rem] border-2 border-[#20342d] bg-white p-4 text-[#20342d] shadow-[0_8px_0_#20342d] sm:max-w-lg sm:p-5"
+        className="app-panel max-h-[calc(100vh-1.5rem)] w-full overflow-y-auto rounded-[28px] p-4 text-[#172019] sm:max-w-lg sm:p-5"
       >
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -172,16 +173,16 @@ export function AddManualMeal({
           <button
             type="button"
             onClick={onClose}
-            className="grid size-10 shrink-0 place-items-center rounded-full border-2 border-[#20342d] bg-white text-[#20342d] shadow-[2px_2px_0_#20342d] transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#20342d]"
+            className="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-[#235b30] shadow-[0_8px_18px_rgba(56,103,43,0.1)] ring-1 ring-[#e1edd8] transition hover:-translate-y-0.5"
             aria-label="Close manual meal form"
           >
             <IconX className="size-5" aria-hidden="true" />
           </button>
         </div>
 
-        <label className="mt-5 flex cursor-pointer items-center justify-between gap-4 rounded-[1rem] border-2 border-[#20342d] bg-[#f3fbf1] p-3 shadow-[2px_2px_0_#20342d]">
+        <label className="mt-5 flex cursor-pointer items-center justify-between gap-4 rounded-2xl bg-[#f1f8ec] p-3 ring-1 ring-[#dce9d4]">
           <span className="flex min-w-0 items-center gap-3">
-            <span className="grid size-10 shrink-0 place-items-center rounded-full border-2 border-[#20342d] bg-white">
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-[#22945f] shadow-sm">
               <IconListDetails className="size-5" aria-hidden="true" />
             </span>
             <span className="min-w-0">
@@ -212,10 +213,10 @@ export function AddManualMeal({
               <label
                 key={mealType}
                 className={[
-                  "flex min-h-11 cursor-pointer items-center justify-center rounded-full border-2 border-[#20342d] px-3 text-xs font-black shadow-[2px_2px_0_#20342d] transition hover:-translate-y-0.5",
+                  "flex min-h-11 cursor-pointer items-center justify-center rounded-xl px-3 text-xs font-bold ring-1 ring-[#dce9d4] transition hover:-translate-y-0.5",
                   formValues.mealType === mealType
-                    ? "bg-[#ffdf5d]"
-                    : "bg-white text-[#66766f]",
+                    ? "bg-[#e8f7df] text-[#235b30] ring-[#65b741]"
+                    : "bg-white text-[#687566]",
                 ].join(" ")}
               >
                 <input
@@ -266,7 +267,7 @@ export function AddManualMeal({
               aria-describedby={
                 formErrors.name ? "manual-meal-name-error" : undefined
               }
-              className="mt-2 h-12 w-full rounded-[0.9rem] border-2 border-[#20342d] bg-[#f3fbf1] px-3 text-sm font-bold outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#20342d]"
+              className="app-field mt-2 h-12 w-full rounded-xl px-3 text-sm font-bold outline-none"
               required
             />
             {formErrors.name ? (
@@ -290,7 +291,7 @@ export function AddManualMeal({
                   description: event.target.value,
                 }))
               }
-              className="mt-2 h-12 w-full rounded-[0.9rem] border-2 border-[#20342d] bg-white px-3 text-sm font-bold outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#20342d]"
+              className="app-field mt-2 h-12 w-full rounded-xl px-3 text-sm font-bold outline-none"
             />
           </label>
 
@@ -314,7 +315,7 @@ export function AddManualMeal({
               aria-describedby={
                 formErrors.calories ? "manual-meal-calories-error" : undefined
               }
-              className="mt-2 h-12 w-full rounded-[0.9rem] border-2 border-[#20342d] bg-[#fff7df] px-3 text-sm font-bold outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#20342d]"
+              className="app-field mt-2 h-12 w-full rounded-xl px-3 text-sm font-bold outline-none"
               required
             />
             {formErrors.calories ? (
@@ -350,7 +351,7 @@ export function AddManualMeal({
                       ? `manual-meal-${macro}-error`
                       : undefined
                   }
-                  className="mt-1 h-11 w-full rounded-[0.8rem] border-2 border-[#20342d] bg-white px-2 text-sm font-bold outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#20342d]"
+                  className="app-field mt-1 h-11 w-full rounded-xl px-2 text-sm font-bold outline-none"
                 />
                 {formErrors[macro] ? (
                   <span
@@ -368,7 +369,7 @@ export function AddManualMeal({
         <button
           type="submit"
           disabled={isSaving || isLoggingMeal}
-          className="mt-6 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full border-2 border-[#20342d] bg-[#ffdf5d] px-4 py-2 text-sm font-black shadow-[0_4px_0_#20342d] transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#20342d] disabled:cursor-not-allowed disabled:bg-white disabled:text-[#66766f]"
+          className="mt-6 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-[#65b741] to-[#22945f] px-4 py-2 text-sm font-bold text-white shadow-[0_14px_28px_rgba(34,148,95,0.25)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <IconDeviceFloppy className="size-5" aria-hidden="true" />
           {isSaving || isLoggingMeal
