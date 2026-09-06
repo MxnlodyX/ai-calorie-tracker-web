@@ -23,16 +23,19 @@ export function MenuAddedCard({ meals }: MenuAddedCardProps) {
       {meals.map((meal) => (
         <div
           key={meal.id}
-          className="app-card flex items-center justify-between gap-4 rounded-[18px] p-3"
+          className="app-card flex min-w-0 items-center justify-between gap-3 overflow-hidden rounded-[18px] p-3 sm:gap-4"
         >
-          <div className="flex min-w-0 items-center gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-3 overflow-hidden">
             <span
               className={`grid size-11 shrink-0 place-items-center rounded-xl text-[#235b30] ${meal.color}`}
             >
               <IconCamera className="size-5" aria-hidden="true" />
             </span>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-bold text-[#172019]">
+            <div className="min-w-0 flex-1 overflow-hidden">
+              <p
+                className="truncate text-sm font-bold text-[#172019]"
+                title={meal.name}
+              >
                 {meal.name}
               </p>
               <p className="truncate text-sm text-[#687566]">
@@ -40,7 +43,7 @@ export function MenuAddedCard({ meals }: MenuAddedCardProps) {
               </p>
             </div>
           </div>
-          <p className="shrink-0 text-sm font-bold text-[#235b30]">
+          <p className="shrink-0 whitespace-nowrap text-sm font-bold text-[#235b30]">
             {meal.calories.toLocaleString()} kcal
           </p>
         </div>

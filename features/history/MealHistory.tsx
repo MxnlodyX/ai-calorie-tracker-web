@@ -16,6 +16,7 @@ import {
 } from "@/features/dashboard/components/icons";
 
 import { useAlert } from "@/components/ui/alert-provider";
+import { InlineLoadingCard } from "@/components/ui/loading";
 import { BottomNavbar } from "@/components/layout/BottomNavbar";
 import type { FoodItem } from "@/features/dashboard/types";
 import {
@@ -610,15 +611,11 @@ export function MealHistory() {
             </p>
           </div>
         ) : isLoadingEntries ? (
-          <div
-            className="app-card mt-5 rounded-2xl p-4 text-center"
-            role="status"
-          >
-            <p className="text-sm font-bold">Loading meal history...</p>
-            <p className="mt-1 text-xs text-[#687566]">
-              Syncing your logged meals.
-            </p>
-          </div>
+          <InlineLoadingCard
+            className="mt-5"
+            title="Loading meal history"
+            message="Syncing your logged meals."
+          />
         ) : null}
 
         <section className="app-panel mt-4 rounded-[24px] p-2.5 sm:mt-6 sm:rounded-[30px] sm:p-5">

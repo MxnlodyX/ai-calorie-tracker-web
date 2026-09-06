@@ -61,12 +61,18 @@ export async function analyzeFoodImage(
   foodImageId: string,
   mealType?: string,
   eatenAt?: string,
+  manualDescription?: string,
 ): Promise<AnalyzeImageResponse> {
   return parseResponse<AnalyzeImageResponse>(
     await apiFetch("/analyze/food-image", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ foodImageId, mealType, eatenAt }),
+      body: JSON.stringify({
+        foodImageId,
+        mealType,
+        eatenAt,
+        manualDescription,
+      }),
     }),
   );
 }
@@ -75,9 +81,15 @@ export async function analyzeSelectedImage(
   file: File,
   mealType?: string,
   eatenAt?: string,
+  manualDescription?: string,
 ): Promise<FoodAnalysis> {
   const uploaded = await uploadFoodImage(file);
-  const analyzed = await analyzeFoodImage(uploaded.data.id, mealType, eatenAt);
+  const analyzed = await analyzeFoodImage(
+    uploaded.data.id,
+    mealType,
+    eatenAt,
+    manualDescription,
+  );
 
   return analyzed.data.analysis;
 }

@@ -13,6 +13,7 @@ import {
 import { useState } from "react";
 
 import { useAlert } from "@/components/ui/alert-provider";
+import { InlineLoadingCard } from "@/components/ui/loading";
 import type { DashboardMeal, MealType } from "@/features/dashboard/types";
 
 type AddExistMealProps = {
@@ -330,15 +331,11 @@ export function AddExistMeal({
           ) : null}
 
           {isLoading ? (
-            <div
-              className="mt-5 rounded-2xl bg-[#eef8e7] p-4 text-center ring-1 ring-[#dce9d4]"
-              role="status"
-            >
-              <p className="text-sm font-black">Loading saved meals...</p>
-              <p className="mt-1 text-xs font-bold text-[#66766f]">
-                Syncing your menu list from the backend.
-              </p>
-            </div>
+            <InlineLoadingCard
+              className="mt-5 bg-[#eef8e7]"
+              title="Loading saved meals"
+              message="Syncing your menu list from the backend."
+            />
           ) : filteredMeals.length > 0 ? (
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               {filteredMeals.map((meal) => (

@@ -14,6 +14,7 @@ import {
 import { BottomNavbar } from "@/components/layout/BottomNavbar";
 import { ProfileMenu } from "@/features/dashboard/components/ProfileMenu";
 import { useAlert } from "@/components/ui/alert-provider";
+import { AppLoadingShell } from "@/components/ui/loading";
 
 import { AddExistMeal } from "./AddExistMeal";
 import { AddManualMeal } from "./AddManualMeal";
@@ -282,11 +283,10 @@ export function Dashboard() {
 
   if (!user && isLoadingUser) {
     return (
-      <main className="app-page grid min-h-screen place-items-center px-4 text-[#172019]">
-        <p className="text-sm font-black" role="status">
-          Loading your dashboard...
-        </p>
-      </main>
+      <AppLoadingShell
+        title="Loading your dashboard"
+        message="Syncing your profile, daily goal, and today's meal log."
+      />
     );
   }
 
