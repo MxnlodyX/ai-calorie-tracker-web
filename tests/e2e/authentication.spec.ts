@@ -21,3 +21,15 @@ test("shows sign-in when the session is unauthorized", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Welcome Back" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
 });
+
+test("keeps sign-in usable while the session check is slow", async ({ page }) => {
+  await page.route("**/authentications/me", () => {
+    // Keep the free-tier backend wake-up path pending.
+  });
+
+  await page.goto("/");
+
+  await expect(page.getByRole("heading", { name: "Welcome Back" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
+  await expect(page.getByText("Checking existing session in the background...")).toBeVisible();
+});

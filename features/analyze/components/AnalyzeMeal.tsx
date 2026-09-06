@@ -12,6 +12,7 @@ import {
   ImagePlus,
   Leaf,
   LoaderCircle,
+  PencilLine,
   RefreshCcw,
   RotateCcw,
   Save,
@@ -40,7 +41,7 @@ import type { FoodAnalysis } from "@/features/analyze/types";
 import { api } from "@/store/api";
 import type { AppDispatch } from "@/store/store";
 
-type FlowStep = "camera" | "processing" | "result";
+type FlowStep = "camera" | "preview" | "processing" | "result";
 
 type NutritionResult = {
   name: string;
@@ -78,12 +79,16 @@ const nutrients = [
 export function AnalyzeMeal() {
   const [step, setStep] = useState<FlowStep>("camera");
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
+  const [isCameraStarting, setIsCameraStarting] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [analysisStage, setAnalysisStage] = useState(0);
   const [result, setResult] = useState<NutritionResult>(initialResult);
   const [analysis, setAnalysis] = useState<FoodAnalysis | null>(null);
   const [eatenAt, setEatenAt] = useState<string | null>(null);
+  const [manualInfoEnabled, setManualInfoEnabled] = useState(false);
+  const [manualDescription, setManualDescription] = useState("");
   const [saveToMealList, setSaveToMealList] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -116,8 +121,21 @@ export function AnalyzeMeal() {
     return () => window.clearInterval(stageTimer);
   }, [step]);
 
+  useEffect(() => {
+    const video = videoRef.current;
+    const stream = streamRef.current;
+    if (!cameraActive || !video || !stream) return;
+
+    video.srcObject = stream;
+    void video.play().catch(() => {
+      setCameraError("Camera is ready. Tap the preview if it does not start.");
+    });
+  }, [cameraActive]);
+
   const startCamera = async () => {
+    if (cameraActive || isCameraStarting) return;
     setCameraError(null);
+    setIsCameraStarting(true);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: "environment" } },
@@ -125,11 +143,10 @@ export function AnalyzeMeal() {
       });
       streamRef.current = stream;
       setCameraActive(true);
-      window.setTimeout(() => {
-        if (videoRef.current) videoRef.current.srcObject = stream;
-      }, 0);
     } catch {
       setCameraError("Camera access is off. You can upload a photo instead.");
+    } finally {
+      setIsCameraStarting(false);
     }
   };
 
@@ -164,7 +181,7 @@ export function AnalyzeMeal() {
     setStep("result");
   };
 
-  const beginAnalysis = async (file: File, url: string) => {
+  const prepareImage = (file: File, url: string) => {
     stopCamera();
     if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
       if (url.startsWith("blob:")) URL.revokeObjectURL(url);
@@ -186,20 +203,30 @@ export function AnalyzeMeal() {
     }
 
     setPhotoUrl(url);
+    setSelectedFile(file);
+    setAnalysis(null);
     setAnalysisStage(0);
+    setStep("preview");
+  };
+
+  const beginAnalysis = async () => {
+    if (!selectedFile) return;
+    stopCamera();
     setStep("processing");
     const selectedEatenAt = new Date().toISOString();
     setEatenAt(selectedEatenAt);
+    const description = manualInfoEnabled ? manualDescription.trim() : "";
 
     try {
       const nextAnalysis = await analyzeSelectedImage(
-        file,
+        selectedFile,
         result.mealType,
         selectedEatenAt,
+        description || undefined,
       );
       setAnalysisResult(nextAnalysis);
     } catch (error) {
-      setStep("camera");
+      setStep("preview");
       showRequestError(error, "Could not analyze this meal");
     }
   };
@@ -220,7 +247,7 @@ export function AnalyzeMeal() {
         const file = new File([blob], `meal-${Date.now()}.jpg`, {
           type: "image/jpeg",
         });
-        void beginAnalysis(file, URL.createObjectURL(blob));
+        prepareImage(file, URL.createObjectURL(blob));
       },
       "image/jpeg",
       0.88,
@@ -230,16 +257,19 @@ export function AnalyzeMeal() {
   const handleFile = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    void beginAnalysis(file, URL.createObjectURL(file));
+    prepareImage(file, URL.createObjectURL(file));
     event.target.value = "";
   };
 
   const reset = () => {
     stopCamera();
     setPhotoUrl(null);
+    setSelectedFile(null);
     setResult(initialResult);
     setAnalysis(null);
     setEatenAt(null);
+    setManualInfoEnabled(false);
+    setManualDescription("");
     setSaveToMealList(false);
     setStep("camera");
   };
@@ -327,9 +357,16 @@ export function AnalyzeMeal() {
           </span>
         </header>
 
-        <ol className="mx-auto mt-3 flex max-w-sm items-center sm:mt-5" aria-label="Analysis progress">
-          {["Photo", "Analyze", "Review"].map((label, index) => {
-            const currentIndex = step === "camera" ? 0 : step === "processing" ? 1 : 2;
+        <ol className="mx-auto mt-3 flex max-w-lg items-center sm:mt-5" aria-label="Analysis progress">
+          {["Photo", "Preview", "Analyze", "Review"].map((label, index) => {
+            const currentIndex =
+              step === "camera"
+                ? 0
+                : step === "preview"
+                  ? 1
+                  : step === "processing"
+                    ? 2
+                    : 3;
             const complete = index < currentIndex;
             const current = index === currentIndex;
             return (
@@ -344,7 +381,7 @@ export function AnalyzeMeal() {
                   </span>
                   <span className="text-[0.62rem] font-black uppercase tracking-wider">{label}</span>
                 </div>
-                {index < 2 ? <span className={`mx-2 mb-5 h-0.5 flex-1 ${complete ? "bg-[#65b741]" : "bg-[#dce9d4]"}`} /> : null}
+                {index < 3 ? <span className={`mx-2 mb-5 h-0.5 flex-1 ${complete ? "bg-[#65b741]" : "bg-[#dce9d4]"}`} /> : null}
               </li>
             );
           })}
@@ -355,9 +392,24 @@ export function AnalyzeMeal() {
             cameraActive={cameraActive}
             cameraError={cameraError}
             videoRef={videoRef}
+            isCameraStarting={isCameraStarting}
             onStartCamera={startCamera}
             onCapture={capturePhoto}
             onFile={handleFile}
+          />
+        ) : null}
+
+        {step === "preview" ? (
+          <PreviewStep
+            photoUrl={photoUrl}
+            mealType={result.mealType}
+            manualInfoEnabled={manualInfoEnabled}
+            manualDescription={manualDescription}
+            onMealTypeChange={(mealType) => setResult({ ...result, mealType })}
+            onManualInfoToggle={() => setManualInfoEnabled((current) => !current)}
+            onManualDescriptionChange={setManualDescription}
+            onAnalyze={beginAnalysis}
+            onRetake={reset}
           />
         ) : null}
 
@@ -388,6 +440,7 @@ export function AnalyzeMeal() {
 
 type CameraStepProps = {
   cameraActive: boolean;
+  isCameraStarting: boolean;
   cameraError: string | null;
   videoRef: React.RefObject<HTMLVideoElement | null>;
   onStartCamera: () => void;
@@ -397,6 +450,7 @@ type CameraStepProps = {
 
 function CameraStep({
   cameraActive,
+  isCameraStarting,
   cameraError,
   videoRef,
   onStartCamera,
@@ -447,16 +501,150 @@ function CameraStep({
           <button
             type="button"
             onClick={onStartCamera}
-            className="inline-flex min-h-12 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-br from-[#65b741] to-[#22945f] px-2 text-xs font-bold text-white shadow-[0_14px_28px_rgba(34,148,95,0.25)] transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65b741] sm:gap-2 sm:px-5 sm:text-sm"
+            disabled={cameraActive || isCameraStarting}
+            className="inline-flex min-h-12 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-br from-[#65b741] to-[#22945f] px-2 text-xs font-bold text-white shadow-[0_14px_28px_rgba(34,148,95,0.25)] transition enabled:hover:-translate-y-0.5 disabled:cursor-default disabled:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65b741] sm:gap-2 sm:px-5 sm:text-sm"
           >
-            <Camera className="size-5" aria-hidden="true" />
-            {cameraActive ? "Camera ready" : "Open camera"}
+            {isCameraStarting ? (
+              <LoaderCircle className="size-5 animate-spin" aria-hidden="true" />
+            ) : (
+              <Camera className="size-5" aria-hidden="true" />
+            )}
+            {isCameraStarting
+              ? "Opening..."
+              : cameraActive
+                ? "Camera ready"
+                : "Open camera"}
           </button>
           <label className="inline-flex min-h-12 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-white px-2 text-xs font-bold text-[#253025] shadow-[0_12px_26px_rgba(56,103,43,0.12)] ring-1 ring-[#e1edd8] transition hover:-translate-y-0.5 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[#65b741] sm:gap-2 sm:px-5 sm:text-sm">
             <ImagePlus className="size-5" aria-hidden="true" />
             Upload photo
-            <input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={onFile} className="sr-only" />
+            <input type="file" accept="image/jpeg,image/png,image/webp" onChange={onFile} className="sr-only" />
           </label>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+type PreviewStepProps = {
+  photoUrl: string | null;
+  mealType: NutritionResult["mealType"];
+  manualInfoEnabled: boolean;
+  manualDescription: string;
+  onMealTypeChange: (mealType: NutritionResult["mealType"]) => void;
+  onManualInfoToggle: () => void;
+  onManualDescriptionChange: (value: string) => void;
+  onAnalyze: () => void;
+  onRetake: () => void;
+};
+
+function PreviewStep({
+  photoUrl,
+  mealType,
+  manualInfoEnabled,
+  manualDescription,
+  onMealTypeChange,
+  onManualInfoToggle,
+  onManualDescriptionChange,
+  onAnalyze,
+  onRetake,
+}: PreviewStepProps) {
+  return (
+    <section className="mx-auto mt-3 grid max-w-5xl gap-3 sm:mt-4 sm:gap-5 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+      <div className="app-panel overflow-hidden rounded-[24px] sm:rounded-[30px]">
+        <div className="relative aspect-[16/10] overflow-hidden sm:aspect-[4/3]">
+          <MealVisual photoUrl={photoUrl} />
+        </div>
+      </div>
+
+      <div className="app-panel rounded-[24px] p-4 sm:rounded-[30px] sm:p-7">
+        <div className="flex items-start gap-3">
+          <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-[#e8f7df] text-[#22945f]">
+            <ScanLine className="size-5" aria-hidden="true" />
+          </span>
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#22945f]">
+              Preview
+            </p>
+            <h2 className="mt-1 text-xl font-bold sm:text-3xl">
+              Ready to analyze?
+            </h2>
+          </div>
+        </div>
+
+        <label className="mt-5 block">
+          <span className="text-xs font-bold text-[#687566]">Meal type</span>
+          <span className="relative mt-1.5 block">
+            <select
+              value={mealType}
+              onChange={(event) =>
+                onMealTypeChange(event.target.value as NutritionResult["mealType"])
+              }
+              className="app-field min-h-12 w-full appearance-none rounded-xl px-4 pr-9 text-sm font-bold outline-none"
+            >
+              <option value="breakfast">Breakfast</option>
+              <option value="lunch">Lunch</option>
+              <option value="dinner">Dinner</option>
+              <option value="additional">Additional</option>
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2" />
+          </span>
+        </label>
+
+        <button
+          type="button"
+          role="switch"
+          aria-checked={manualInfoEnabled}
+          onClick={onManualInfoToggle}
+          className="mt-4 flex w-full items-center gap-2.5 rounded-xl bg-[#f1f8ec] p-2.5 text-left ring-1 ring-[#dce9d4] transition hover:bg-[#e8f5df] sm:gap-3 sm:rounded-2xl sm:p-3"
+        >
+          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-[#22945f] shadow-[0_8px_18px_rgba(56,103,43,0.1)]">
+            <PencilLine className="size-5" aria-hidden="true" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-bold">Add manual information</span>
+            <span className="mt-0.5 block text-xs text-[#687566]">
+              Include notes like ingredients, portion size, or cooking method.
+            </span>
+          </span>
+          <span className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${manualInfoEnabled ? "bg-[#65b741]" : "bg-[#cfd9ca]"}`}>
+            <span className={`absolute top-1 size-5 rounded-full bg-white shadow-sm transition-transform ${manualInfoEnabled ? "translate-x-[1.35rem]" : "translate-x-1"}`} />
+          </span>
+        </button>
+
+        {manualInfoEnabled ? (
+          <label className="mt-3 block">
+            <span className="text-xs font-bold text-[#687566]">
+              Description
+            </span>
+            <textarea
+              value={manualDescription}
+              onChange={(event) => onManualDescriptionChange(event.target.value)}
+              rows={4}
+              maxLength={600}
+              placeholder="Example: grilled chicken rice bowl, half avocado, light sauce"
+              className="app-field mt-1.5 w-full resize-none rounded-xl px-4 py-3 text-sm font-bold leading-5 outline-none"
+            />
+          </label>
+        ) : null}
+
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:gap-3">
+          <button
+            type="button"
+            onClick={onAnalyze}
+            className="inline-flex min-h-12 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-br from-[#65b741] to-[#22945f] px-2 text-xs font-bold text-white shadow-[0_14px_28px_rgba(34,148,95,0.25)] transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65b741] sm:gap-2 sm:px-5 sm:text-sm"
+          >
+            <Sparkles className="size-5" aria-hidden="true" />
+            Analyze meal
+          </button>
+          <button
+            type="button"
+            onClick={onRetake}
+            className="inline-flex min-h-12 items-center justify-center gap-1.5 rounded-xl bg-white px-2 text-xs font-bold text-[#253025] shadow-[0_12px_26px_rgba(56,103,43,0.12)] ring-1 ring-[#e1edd8] transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65b741] sm:gap-2 sm:px-5 sm:text-sm"
+          >
+            <RotateCcw className="size-4" aria-hidden="true" />
+            Choose again
+          </button>
         </div>
       </div>
     </section>

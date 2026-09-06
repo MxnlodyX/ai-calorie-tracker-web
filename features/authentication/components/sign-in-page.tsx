@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { AppLoadingShell, LoadingStatusPill } from "@/components/ui/loading";
 import { startGoogleSignIn } from "@/features/authentication/api";
 import { useGetMeQuery } from "@/store/api";
 
@@ -20,7 +21,7 @@ export function SignInPage() {
   const { data: user, error, isLoading, isFetching } = useGetMeQuery();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSigningIn, setIsSigningIn] = useState(false);
-
+  const isCheckingSession = (isLoading || isFetching) && !user;
   useEffect(() => {
     if (user) {
       router.replace("/dashboard");
@@ -33,18 +34,17 @@ export function SignInPage() {
     startGoogleSignIn();
   };
 
-  if (isLoading || isFetching || user) {
+  if (user) {
     return (
-      <main className="grid min-h-screen place-items-center bg-[#f7fbf3] px-5 text-[#172019]">
-        <p className="text-sm font-black" role="status">
-          Checking your session...
-        </p>
-      </main>
+      <AppLoadingShell
+        title="Opening your dashboard"
+        message="Your session is ready. We are bringing your nutrition log into view."
+      />
     );
   }
 
   const sessionError =
-    error && getResponseStatus(error) !== 401
+    !isCheckingSession && error && getResponseStatus(error) !== 401
       ? "We could not check your session. You can still try signing in with Google."
       : null;
 
@@ -58,13 +58,10 @@ export function SignInPage() {
 
         <div className="rounded-t-[30px] bg-white/88 px-5 pb-8 pt-6 shadow-[0_-18px_44px_rgba(255,255,255,0.72)] sm:px-7">
           <div className="text-center">
-            <div className="mx-auto grid size-16 place-items-center rounded-2xl bg-gradient-to-br from-[#65b741] to-[#22945f] text-white shadow-[0_16px_34px_rgba(34,148,95,0.28)]">
-              <SparkIcon />
-            </div>
             <p className="mt-5 text-2xl font-black tracking-normal text-[#235b30]">
               AI Calories Track
             </p>
-            <h1 className="mt-7 text-3xl font-bold tracking-normal text-[#172019]">
+            <h1 className="mt-3 text-3xl font-bold tracking-normal text-[#172019]">
               Welcome Back
             </h1>
             <p className="mx-auto mt-3 max-w-[300px] text-sm leading-6 text-[#536052]">
@@ -86,6 +83,10 @@ export function SignInPage() {
             <p className="mt-4 text-center text-sm text-red-600">
               {errorMessage ?? sessionError}
             </p>
+          )}
+
+          {isCheckingSession && (
+            <LoadingStatusPill message="Starting the server and checking your session. This may take up to a minute..." />
           )}
           <p className="mx-auto mt-6 max-w-[300px] text-center text-xs leading-5 text-[#687566]">
             Your account is created or restored automatically using your Google profile.
@@ -140,23 +141,29 @@ function NutritionIllustration({ className }: { className?: string }) {
     </svg>
   );
 }
-
-function SparkIcon() {
-  return (
-    <svg aria-hidden="true" className="size-9" fill="none" viewBox="0 0 48 48">
-      <path d="M24 6 28.7 19.3 42 24l-13.3 4.7L24 42l-4.7-13.3L6 24l13.3-4.7L24 6Z" fill="currentColor" opacity=".95" />
-      <path d="M36 6 38 12 44 14 38 16 36 22 34 16 28 14 34 12 36 6Z" fill="#FFE79B" />
-    </svg>
-  );
-}
-
 function GoogleIcon() {
   return (
-    <svg aria-hidden="true" className="size-7 shrink-0" viewBox="0 0 48 48">
-      <path d="M44.5 24.4c0-1.5-.1-2.7-.4-4H24v7.7h11.8a10 10 0 0 1-4.4 6.6v5.1h7.1c4.1-3.8 6-9.4 6-15.4Z" fill="#4285F4" />
-      <path d="M24 45c5.9 0 10.8-1.9 14.5-5.2l-7.1-5.1A13.1 13.1 0 0 1 4.5 30.8H-2v5.3A21 21 0 0 0 24 45Z" fill="#34A853" />
-      <path d="M10.9 27.5a13 13 0 0 1 0-7l-7.2-5.5A21 21 0 0 0 3.7 36l7.2-5.5Z" fill="#FBBC05" />
-      <path d="M24 10.2c3.2 0 5.4 1.4 6.7 2.6l6.1-6A21 21 0 0 0 3.7 15l7.2 5.5A12.6 12.6 0 0 1 24 10.2Z" fill="#EA4335" />
+    <svg
+      aria-hidden="true"
+      className="size-6 shrink-0"
+      viewBox="0 0 24 24"
+    >
+      <path
+        fill="#4285F4"
+        d="M21.6 12.23c0-.71-.06-1.4-.18-2.05H12v3.87h5.38a4.6 4.6 0 0 1-2 3.02v2.51h3.24c1.9-1.75 2.98-4.33 2.98-7.35Z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 22c2.7 0 4.97-.9 6.62-2.42l-3.24-2.51c-.9.6-2.05.96-3.38.96-2.6 0-4.8-1.76-5.59-4.13H3.07v2.59A10 10 0 0 0 12 22Z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M6.41 13.9A6.02 6.02 0 0 1 6.1 12c0-.66.11-1.3.31-1.9V7.51H3.07A10 10 0 0 0 2 12c0 1.61.38 3.14 1.07 4.49l3.34-2.59Z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 5.97c1.47 0 2.79.51 3.82 1.5l2.87-2.87A9.63 9.63 0 0 0 12 2a10 10 0 0 0-8.93 5.51l3.34 2.59C7.2 7.73 9.4 5.97 12 5.97Z"
+      />
     </svg>
   );
 }

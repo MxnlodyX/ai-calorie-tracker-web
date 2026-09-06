@@ -5,6 +5,7 @@ import {
 } from "./icons";
 
 import { MenuAddedCard } from "./MenuAddedCard";
+import { InlineLoadingCard } from "@/components/ui/loading";
 import type { DashboardMeal } from "@/features/dashboard/types";
 
 type TodayLogProps = {
@@ -180,17 +181,11 @@ export function TodayLog({
             </p>
           </div>
         ) : isLoading ? (
-          <div
-            className="app-card mt-4 rounded-2xl p-4 text-center"
-            role="status"
-          >
-            <p className="text-sm font-black text-[#20342d]">
-              Loading meals...
-            </p>
-            <p className="mt-1 text-xs font-bold text-[#65746d]">
-              Syncing your food log.
-            </p>
-          </div>
+          <InlineLoadingCard
+            className="mt-4"
+            title="Loading meals"
+            message="Syncing your food log."
+          />
         ) : (
           <MenuAddedCard meals={meals} />
         )}
