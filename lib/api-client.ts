@@ -1,4 +1,5 @@
 import { getApiUrl } from "@/lib/api-url";
+import { runWithSessionRefresh } from "@/lib/session-refresh";
 
 export type ApiResponse<T> = {
   data: T;
@@ -9,16 +10,19 @@ type ApiErrorResponse = {
 };
 
 export function apiFetch(path: string, init?: RequestInit): Promise<Response> {
-  return fetch(getApiUrl(path), {
-    ...init,
-    credentials: "include",
-  });
+  return runWithSessionRefresh(
+    () =>
+      fetch(getApiUrl(path), {
+        ...init,
+        credentials: "include",
+      }),
+    (response) => response.status === 401,
+  );
 }
 
 async function parseApiResponse<T>(response: Response): Promise<T> {
   const payload = (await response.json().catch(() => ({}))) as
-    | ApiResponse<T>
-    | ApiErrorResponse;
+    ApiResponse<T> | ApiErrorResponse;
 
   if (!response.ok) {
     throw new Error(

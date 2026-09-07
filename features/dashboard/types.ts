@@ -25,7 +25,6 @@ export type FoodItem = {
 };
 
 export type CreateFoodPayload = {
-  userId: string;
   name: string;
   mealType: string;
   kcal: number;
@@ -35,7 +34,7 @@ export type CreateFoodPayload = {
   eatenAt: string;
 };
 
-export type UpdateFoodPayload = Partial<Omit<CreateFoodPayload, "userId">>;
+export type UpdateFoodPayload = Partial<CreateFoodPayload>;
 
 export type MenulistItem = {
   id: string;
@@ -49,10 +48,6 @@ export type MenulistItem = {
   fatG?: number | null;
 };
 
-export type CreateMenulistPayload = Omit<MenulistItem, "id"> & {
-  userId: string;
-};
+export type CreateMenulistPayload = Omit<MenulistItem, "id" | "userId">;
 
-export type UpdateMenulistPayload = Partial<
-  Omit<CreateMenulistPayload, "userId">
->;
+export type UpdateMenulistPayload = Partial<CreateMenulistPayload>;

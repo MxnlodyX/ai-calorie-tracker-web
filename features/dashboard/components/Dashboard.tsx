@@ -15,7 +15,7 @@ import { BottomNavbar } from "@/components/layout/BottomNavbar";
 import { ProfileMenu } from "@/features/dashboard/components/ProfileMenu";
 import { useAlert } from "@/components/ui/alert-provider";
 import { AppLoadingShell } from "@/components/ui/loading";
-
+import { useRedirectOnUnauthorized } from "@/features/authentication/hooks/use-redirect-on-unauthorized";
 import { AddExistMeal } from "./AddExistMeal";
 import { AddManualMeal } from "./AddManualMeal";
 import { TodayLog } from "./TodayLog";
@@ -76,8 +76,11 @@ const dietModeLabels = {
 export function Dashboard() {
   const {
     data: user,
+    error: userError,
     isLoading: isLoadingUser,
   } = useGetMeQuery();
+
+  useRedirectOnUnauthorized(userError);
   const [createFoodMutation, createFoodMutationResult] =
     useCreateFoodMutation();
   const [existingMeals, setExistingMeals] = useState<DashboardMeal[]>([]);
@@ -138,7 +141,7 @@ export function Dashboard() {
       setExistingMealsError(null);
 
       try {
-        const menulists = await getMenulists(activeUserId);
+        const menulists = await getMenulists();
         const nextMeals = menulists.map(menulistToDashboardMeal);
 
         if (!isMounted) {
@@ -181,7 +184,7 @@ export function Dashboard() {
 
     try {
       await createFoodMutation(
-        dashboardMealToFoodPayload(meal, activeUserId),
+        dashboardMealToFoodPayload(meal),
       ).unwrap();
       return true;
     } catch (error) {
@@ -207,7 +210,7 @@ export function Dashboard() {
 
     try {
       const savedMeal = await createMenulist(
-        dashboardMealToMenulistPayload(meal, activeUserId),
+        dashboardMealToMenulistPayload(meal),
       );
       const nextMeal = menulistToDashboardMeal(savedMeal);
 

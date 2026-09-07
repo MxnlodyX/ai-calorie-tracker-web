@@ -47,10 +47,8 @@ export function foodToDashboardMeal(item: FoodItem): DashboardMeal {
 
 export function dashboardMealToMenulistPayload(
   meal: DashboardMeal,
-  userId: string,
 ): CreateMenulistPayload {
   return {
-    userId,
     name: meal.name,
     mealType: meal.mealType,
     description: meal.description || undefined,
@@ -63,10 +61,8 @@ export function dashboardMealToMenulistPayload(
 
 export function dashboardMealToFoodPayload(
   meal: DashboardMeal,
-  userId: string,
 ): CreateFoodPayload {
   return {
-    userId,
     name: meal.name,
     mealType: meal.mealType.toLowerCase(),
     kcal: meal.calories,

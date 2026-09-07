@@ -1,4 +1,10 @@
-import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+import {
+  createApi,
+  fetchBaseQuery,
+  type BaseQueryFn,
+  type FetchArgs,
+  type FetchBaseQueryError,
+} from "@reduxjs/toolkit/query/react";
 
 import type {
   CreateFoodPayload,
@@ -6,6 +12,8 @@ import type {
   UpdateFoodPayload,
 } from "@/features/dashboard/types";
 import { API_BASE_URL } from "@/lib/api-url";
+import { getLocalDayUtcRange } from "@/lib/local-date-range";
+import { runWithSessionRefresh } from "@/lib/session-refresh";
 
 export type DietMode = "lose" | "maintain" | "gain";
 
@@ -40,6 +48,8 @@ type ApiEnvelope<T> = { data: T };
 type MealHistoryQuery = {
   month: number;
   year: number;
+  from: string;
+  to: string;
 };
 
 type LegacyMeal = {
@@ -126,24 +136,41 @@ function toFoodItem(item: FoodItem | LegacyMeal): FoodItem {
   };
 }
 
-function unwrapFoodItems(response: Array<FoodItem | LegacyMeal> | ApiEnvelope<Array<FoodItem | LegacyMeal>>) {
+function unwrapFoodItems(
+  response:
+    Array<FoodItem | LegacyMeal> | ApiEnvelope<Array<FoodItem | LegacyMeal>>,
+) {
   return unwrapResponse(response).map(toFoodItem);
 }
 
-function unwrapFoodItem(response: FoodItem | LegacyMeal | ApiEnvelope<FoodItem | LegacyMeal>) {
+function unwrapFoodItem(
+  response: FoodItem | LegacyMeal | ApiEnvelope<FoodItem | LegacyMeal>,
+) {
   return toFoodItem(unwrapResponse(response));
 }
 
+const rawBaseQuery = fetchBaseQuery({
+  baseUrl: API_BASE_URL,
+  credentials: "include",
+  prepareHeaders: (headers) => {
+    headers.set("accept", "application/json");
+    return headers;
+  },
+});
+
+const baseQueryWithSessionRefresh: BaseQueryFn<
+  string | FetchArgs,
+  unknown,
+  FetchBaseQueryError
+> = (args, api, extraOptions) =>
+  runWithSessionRefresh(
+    () => Promise.resolve(rawBaseQuery(args, api, extraOptions)),
+    (result) => result.error?.status === 401,
+  );
+
 export const api = createApi({
   reducerPath: "api",
-  baseQuery: fetchBaseQuery({
-    baseUrl: API_BASE_URL,
-    credentials: "include",
-    prepareHeaders: (headers) => {
-      headers.set("accept", "application/json");
-      return headers;
-    },
-  }),
+  baseQuery: baseQueryWithSessionRefresh,
   tagTypes: ["Me", "Profile", "MealHistory", "FoodsByDate"],
   endpoints: (builder) => ({
     getMe: builder.query<UserProfile, void>({
@@ -168,9 +195,7 @@ export const api = createApi({
       async onQueryStarted(_body, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
-          dispatch(
-            api.util.updateQueryData("getMe", undefined, () => data),
-          );
+          dispatch(api.util.updateQueryData("getMe", undefined, () => data));
           dispatch(
             api.util.updateQueryData("getProfile", undefined, () => data),
           );
@@ -181,8 +206,8 @@ export const api = createApi({
       invalidatesTags: (result) => (result ? ["Me", "Profile"] : []),
     }),
     getMealCalendarHistory: builder.query<FoodItem[], MealHistoryQuery>({
-      query: ({ month, year }) =>
-        `/meal-calendar-history?month=${encodeURIComponent(month)}&year=${encodeURIComponent(year)}`,
+      query: ({ month, year, from, to }) =>
+        `/meal-calendar-history?month=${encodeURIComponent(month)}&year=${encodeURIComponent(year)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
       transformResponse: unwrapFoodItems,
       providesTags: (_result, _error, { month, year }) => [
         { type: "MealHistory", id: `${year}-${month}` },
@@ -190,7 +215,10 @@ export const api = createApi({
       keepUnusedDataFor: 300,
     }),
     getFoodsByDate: builder.query<FoodItem[], string>({
-      query: (date) => `/foods?date=${encodeURIComponent(date)}`,
+      query: (date) => {
+        const { from, to } = getLocalDayUtcRange(date);
+        return `/foods?date=${encodeURIComponent(date)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+      },
       transformResponse: unwrapFoodItems,
       providesTags: (_result, _error, date) => [
         { type: "FoodsByDate", id: date },
