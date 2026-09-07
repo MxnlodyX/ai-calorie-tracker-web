@@ -1,12 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  apiDelete,
-  apiGet,
-  apiPatch,
-  apiPost,
-  apiPut,
-} from "@/lib/api-client";
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "@/lib/api-client";
 
 describe("API client", () => {
   beforeEach(() => {
@@ -48,17 +42,52 @@ describe("API client", () => {
       expect.objectContaining({
         method,
         body: JSON.stringify({ name: "Soup" }),
-        headers: expect.objectContaining({ "Content-Type": "application/json" }),
+        headers: expect.objectContaining({
+          "Content-Type": "application/json",
+        }),
       }),
     );
   });
 
   it("surfaces backend errors", async () => {
     vi.mocked(fetch).mockResolvedValue(
-      new Response(JSON.stringify({ error: "Session expired" }), { status: 401 }),
+      new Response(JSON.stringify({ error: "Session expired" }), {
+        status: 401,
+      }),
     );
 
-    await expect(apiGet("/authentications/me")).rejects.toThrow("Session expired");
+    await expect(apiGet("/authentications/me")).rejects.toThrow(
+      "Session expired",
+    );
+  });
+
+  it("retries the original request after refreshing the session", async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: "Session expired" }), {
+          status: 401,
+        }),
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ data: { id: "user-1" } }), {
+          status: 200,
+        }),
+      );
+
+    await expect(apiGet<{ id: string }>("/users/profile")).resolves.toEqual({
+      id: "user-1",
+    });
+
+    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(fetch).toHaveBeenNthCalledWith(
+      2,
+      expect.stringMatching(/\/authentications\/refresh$/),
+      expect.objectContaining({ method: "POST", credentials: "include" }),
+    );
+    expect(vi.mocked(fetch).mock.calls[2]).toEqual(
+      vi.mocked(fetch).mock.calls[0],
+    );
   });
 
   it("accepts empty 204 delete responses", async () => {

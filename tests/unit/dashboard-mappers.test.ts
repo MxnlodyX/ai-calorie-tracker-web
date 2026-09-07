@@ -76,8 +76,7 @@ describe("dashboard mappers", () => {
   it("creates backend payloads with normalized fields", () => {
     vi.setSystemTime(new Date(2026, 7, 5, 12, 34, 56));
 
-    expect(dashboardMealToMenulistPayload(meal, "user-1")).toEqual({
-      userId: "user-1",
+    expect(dashboardMealToMenulistPayload(meal)).toEqual({
       name: "Chicken rice",
       mealType: "Lunch",
       description: "High protein",
@@ -86,11 +85,13 @@ describe("dashboard mappers", () => {
       carbG: 58,
       fatG: 14,
     });
-    expect(dashboardMealToFoodPayload(meal, "user-1")).toMatchObject({
-      userId: "user-1",
+    const payload = dashboardMealToFoodPayload(meal);
+
+    expect(payload).toMatchObject({
       mealType: "lunch",
       eatenAt: "2026-08-05T12:34:56",
     });
+    expect(payload).not.toHaveProperty("userId");
   });
 
   it("recognizes today and rejects invalid timestamps", () => {

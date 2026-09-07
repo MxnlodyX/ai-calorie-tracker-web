@@ -10,10 +10,9 @@ import type {
 } from "./types";
 
 const dashboardEndpoints = {
-  foods: (userId: string) => `/foods?userId=${encodeURIComponent(userId)}`,
+  foods: "/foods",
   food: (mealId: string) => `/foods/${encodeURIComponent(mealId)}`,
-  foodLists: (userId: string) =>
-    `/food-lists?userId=${encodeURIComponent(userId)}`,
+  foodLists: "/food-lists",
   foodList: (mealId: string) => `/food-lists/${encodeURIComponent(mealId)}`,
 };
 
@@ -48,9 +47,9 @@ function toFoodItem(item: FoodItem | LegacyMeal): FoodItem {
   };
 }
 
-export async function getFoods(userId: string): Promise<FoodItem[]> {
+export async function getFoods(): Promise<FoodItem[]> {
   const foods = await apiGet<Array<FoodItem | LegacyMeal>>(
-    dashboardEndpoints.foods(userId),
+    dashboardEndpoints.foods,
   );
 
   return foods.map(toFoodItem);
@@ -74,8 +73,8 @@ export function deleteFood(mealId: string) {
   return apiDelete(dashboardEndpoints.food(mealId));
 }
 
-export function getMenulists(userId: string) {
-  return apiGet<MenulistItem[]>(dashboardEndpoints.foodLists(userId));
+export function getMenulists() {
+  return apiGet<MenulistItem[]>(dashboardEndpoints.foodLists);
 }
 
 export function createMenulist(payload: CreateMenulistPayload) {

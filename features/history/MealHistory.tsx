@@ -14,11 +14,12 @@ import {
   IconTrendingUp,
   IconX,
 } from "@/features/dashboard/components/icons";
-
+import { useRedirectOnUnauthorized } from "@/features/authentication/hooks/use-redirect-on-unauthorized";
 import { useAlert } from "@/components/ui/alert-provider";
 import { InlineLoadingCard } from "@/components/ui/loading";
 import { BottomNavbar } from "@/components/layout/BottomNavbar";
 import type { FoodItem } from "@/features/dashboard/types";
+import { getLocalMonthUtcRange } from "@/lib/local-date-range";
 import {
   useDeleteFoodMutation,
   useGetMeQuery,
@@ -167,7 +168,7 @@ function createEmptyDiaryDay(
   const date = `${year}-${month.toString().padStart(2, "0")}-${day
     .toString()
     .padStart(2, "0")}`;
-  const weekday = new Date(date).toLocaleDateString("en-US", {
+  const weekday = new Date(year, month - 1, day).toLocaleDateString("en-US", {
     weekday: "long",
   });
 
@@ -289,9 +290,7 @@ function foodListToDiaryDays(
         ),
       );
     })
-    .sort((firstDay, secondDay) =>
-      firstDay.date.localeCompare(secondDay.date),
-    );
+    .sort((firstDay, secondDay) => firstDay.date.localeCompare(secondDay.date));
 }
 
 function createMealFormValues(meal: MealEntry): MealFormValues {
@@ -323,15 +322,23 @@ const getErrorMessage = (error: unknown) =>
 
 export function MealHistory() {
   const { showAlert } = useAlert();
-  const { data: user, isLoading: isLoadingUser } = useGetMeQuery();
+  const {
+    data: user,
+    error: userError,
+    isLoading: isLoadingUser,
+  } = useGetMeQuery();
+
+  useRedirectOnUnauthorized(userError);
   const activeUserId = user?.id ?? "";
   const dailyGoalCalories = user?.kcalGoal ?? null;
   const [selectedMonth, setSelectedMonth] = useState(
     () => new Date().getMonth() + 1,
   );
-  const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
-  const [selectedDayNumber, setSelectedDayNumber] = useState(
-    () => new Date().getDate(),
+  const [selectedYear, setSelectedYear] = useState(() =>
+    new Date().getFullYear(),
+  );
+  const [selectedDayNumber, setSelectedDayNumber] = useState(() =>
+    new Date().getDate(),
   );
   const [editingMeal, setEditingMeal] = useState<EditingMeal | null>(null);
   const [mealFormValues, setMealFormValues] = useState<MealFormValues | null>(
@@ -339,6 +346,10 @@ export function MealHistory() {
   );
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(
     null,
+  );
+  const historyRange = useMemo(
+    () => getLocalMonthUtcRange(selectedYear, selectedMonth),
+    [selectedMonth, selectedYear],
   );
 
   useEffect(() => {
@@ -366,6 +377,7 @@ export function MealHistory() {
     {
       month: selectedMonth,
       year: selectedYear,
+      ...historyRange,
     },
     {
       skip: isLoadingUser || !activeUserId,
@@ -528,7 +540,9 @@ export function MealHistory() {
           proteinG: updatedMeal.macros.protein,
           carbG: updatedMeal.macros.carbs,
           fatG: updatedMeal.macros.fat,
-          eatenAt: `${originalMeal.date}T${updatedMeal.time}:00`,
+          eatenAt: new Date(
+            `${originalMeal.date}T${updatedMeal.time}:00`,
+          ).toISOString(),
         },
       }).unwrap();
       savedMeal = foodToMealEntry(updatedItem);
@@ -572,7 +586,9 @@ export function MealHistory() {
             <select
               id="diary-month"
               value={selectedMonth}
-              onChange={(event) => handleMonthChange(Number(event.target.value))}
+              onChange={(event) =>
+                handleMonthChange(Number(event.target.value))
+              }
               className="app-field h-12 w-full rounded-xl px-3 text-sm font-bold outline-none sm:h-11 sm:w-auto"
             >
               {monthOptions.map((month) => (
@@ -606,9 +622,7 @@ export function MealHistory() {
             role="status"
           >
             <p className="text-sm font-bold">History could not load</p>
-            <p className="mt-1 text-xs text-[#687566]">
-              {entriesError}
-            </p>
+            <p className="mt-1 text-xs text-[#687566]">{entriesError}</p>
           </div>
         ) : isLoadingEntries ? (
           <InlineLoadingCard
@@ -625,9 +639,7 @@ export function MealHistory() {
             </span>
             <div>
               <h2 className="text-sm font-bold">{selectedMonthLabel}</h2>
-              <p className="text-xs text-[#687566]">
-                Daily calorie diary
-              </p>
+              <p className="text-xs text-[#687566]">Daily calorie diary</p>
             </div>
           </div>
 
@@ -665,7 +677,9 @@ export function MealHistory() {
                 >
                   <span>{day}</span>
                   {hasMeals ? (
-                    <span className={`absolute bottom-1 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full ${isSelected ? "bg-white" : "bg-[#f29d38]"}`} />
+                    <span
+                      className={`absolute bottom-1 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full ${isSelected ? "bg-white" : "bg-[#f29d38]"}`}
+                    />
                   ) : null}
                 </button>
               );
@@ -737,9 +751,7 @@ export function MealHistory() {
                 style={{ width: `${goalProgress}%` }}
               />
             </div>
-            <p className="mt-3 text-xs text-white/70">
-              {selectedDay.note}
-            </p>
+            <p className="mt-3 text-xs text-white/70">{selectedDay.note}</p>
           </div>
 
           <section className="mt-4 sm:mt-5">
@@ -776,7 +788,10 @@ export function MealHistory() {
                               {meal.title}
                             </h3>
                             <p className="mt-1 flex items-center gap-1.5 text-xs text-[#687566]">
-                              <IconClock className="size-4" aria-hidden="true" />
+                              <IconClock
+                                className="size-4"
+                                aria-hidden="true"
+                              />
                               {meal.mealType} - {meal.time}
                             </p>
                           </div>
@@ -1035,7 +1050,9 @@ function ConfirmActionDialog({
           <span
             className={[
               "grid size-11 shrink-0 place-items-center rounded-2xl",
-              isDelete ? "bg-[#fff0df] text-[#a94f35]" : "bg-[#e8f7df] text-[#22945f]",
+              isDelete
+                ? "bg-[#fff0df] text-[#a94f35]"
+                : "bg-[#e8f7df] text-[#22945f]",
             ].join(" ")}
           >
             <IconAlertTriangle className="size-6" aria-hidden="true" />
@@ -1073,7 +1090,9 @@ function ConfirmActionDialog({
             disabled={isSaving}
             className={[
               "inline-flex min-h-11 items-center justify-center rounded-xl px-4 text-sm font-bold transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-60",
-              isDelete ? "bg-[#fff0df] text-[#a94f35] ring-1 ring-[#f2d8ca] focus-visible:outline-[#e77755]" : "bg-gradient-to-br from-[#65b741] to-[#22945f] text-white shadow-[0_12px_24px_rgba(34,148,95,0.24)] focus-visible:outline-[#65b741]",
+              isDelete
+                ? "bg-[#fff0df] text-[#a94f35] ring-1 ring-[#f2d8ca] focus-visible:outline-[#e77755]"
+                : "bg-gradient-to-br from-[#65b741] to-[#22945f] text-white shadow-[0_12px_24px_rgba(34,148,95,0.24)] focus-visible:outline-[#65b741]",
             ].join(" ")}
           >
             {isSaving ? "Saving..." : isDelete ? "Delete meal" : "Save changes"}

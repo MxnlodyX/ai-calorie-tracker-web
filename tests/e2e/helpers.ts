@@ -44,7 +44,7 @@ export async function mockAuthenticatedBackend(page: Page) {
   await page.route("**/foods?date=*", (route) =>
     fulfillJson(route, { data: [] }),
   );
-  await page.route("**/food-lists?userId=*", (route) =>
+  await page.route("**/food-lists", (route) =>
     fulfillJson(route, { data: [] }),
   );
   await page.route("**/meal-calendar-history?*", (route) =>
