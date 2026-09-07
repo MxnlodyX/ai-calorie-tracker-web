@@ -44,6 +44,7 @@ test("uploads, reviews, and accepts an analyzed meal", async ({ page }) => {
     buffer: Buffer.from("img"),
   });
 
+  await page.getByRole("button", { name: "Analyze meal" }).click();
   await expect(page.getByRole("heading", { name: "Review your meal" })).toBeVisible();
   await expect(page.getByRole("textbox", { name: "Meal name" })).toHaveValue(
     "Chicken rice",
